@@ -354,7 +354,7 @@ async function startGame() {
     addValidWord(solution);
   }
 
-  // location.reload();
+  location.reload();
 }
 
 console.clear();
