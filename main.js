@@ -96,9 +96,8 @@ async function fetchFrenchWordList() {
   const text = await response.text();
   const validWords = loadValidWords();
 
-  const allWords = text
-    .split(/\r?\n/)
-    .concat(validWords)
+  const allWords = validWords
+    .concat(text.split(/\r?\n/))
     .map((w) =>
       w
         .trim()
