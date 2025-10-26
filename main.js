@@ -289,6 +289,15 @@ function getSolutionWord() {
   return keyboard?.getElementsByTagName("STRONG")[0].textContent ?? null;
 }
 
+function getTotalScore() {
+  const scoreElem = document.getElementsByClassName("score_total")[0];
+
+  if (!scoreElem) {
+    console.warn("Élément de score non trouvé.");
+  }
+  return parseInt(scoreElem.textContent.replace(/\s+/g, ""), 10);
+}
+
 // ============================
 // 🚀 BOUCLE PRINCIPALE DU JEU
 // ============================
@@ -305,6 +314,11 @@ async function startGame() {
     .filter((w) => !invalidWords.includes(w));
 
   const gameState = initializeGameStateFromGrid();
+  const score = getTotalScore();
+
+  if (score >= 329170) {
+    return;
+  }
 
   let attempt = 0;
 
