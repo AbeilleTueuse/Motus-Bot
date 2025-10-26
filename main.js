@@ -53,7 +53,7 @@ function saveValidWords(words) {
 
 function addValidWord(word) {
   const words = loadValidWords();
-  if (!words.includes(word)) {
+  if (!words.includes(word) && word !== null) {
     words.push(word);
     saveValidWords(words);
   }
@@ -90,26 +90,27 @@ const KEYBOARD_MAP = buildKeyboardMap();
 async function fetchFrenchWordList() {
   const url = PROXY_PREFIX + encodeURIComponent(WORD_SOURCE_URL);
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Erreur de téléchargement : ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Erreur de téléchargement : ${response.status}`);
 
   const text = await response.text();
+  const validWords = loadValidWords();
 
-  return Array.from(
-    new Set(
-      text
-        .split(/\r?\n/)
-        .map((w) =>
-          w
-            .trim()
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/œ/g, "oe")
-            .replace(/æ/g, "ae")
-        )
-        .filter((w) => w && !w.includes("-") && !w.includes(" "))
+  const allWords = text
+    .split(/\r?\n/)
+    .concat(validWords)
+    .map((w) =>
+      w
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/œ/g, "oe")
+        .replace(/æ/g, "ae")
     )
-  );
+    .filter((w) => w && /^[a-z]+$/.test(w));
+
+  return Array.from(new Set(allWords));
 }
 
 // ============================
@@ -195,29 +196,34 @@ function updateGameState(gameState, rowData) {
   });
 }
 
-function findNextCandidate(wordList, gameState) {
-  return wordList.find((word) => {
-    const letters = word.split("");
+function findNextCandidate(wordList, gameState, triedWords) {
+  return (
+    wordList.find((word) => {
+      const letters = word.split("");
 
-    // Lettres bien placées
-    for (const [i, l] of Object.entries(gameState.wellPlaced)) {
-      if (letters[i] !== l) return false;
-    }
+      // Lettres bien placées
+      for (const [i, l] of Object.entries(gameState.wellPlaced)) {
+        if (letters[i] !== l) return false;
+      }
 
-    // Lettres mal placées
-    for (const l of gameState.misplaced) {
-      if (!letters.includes(l)) return false;
-      const excluded = gameState.excludedPositions[l] || [];
-      if (excluded.some((pos) => letters[pos] === l)) return false;
-    }
+      // Lettres mal placées
+      for (const l of gameState.misplaced) {
+        if (!letters.includes(l)) return false;
+        const excluded = gameState.excludedPositions[l] || [];
+        if (excluded.some((pos) => letters[pos] === l)) return false;
+      }
 
-    // Lettres absentes
-    for (const l of gameState.absent) {
-      if (letters.includes(l)) return false;
-    }
+      // Lettres absentes
+      for (const l of gameState.absent) {
+        if (letters.includes(l)) return false;
+      }
 
-    return true;
-  }) || null;
+      // Mot déjà essayé
+      if (triedWords.has(word)) return false;
+
+      return true;
+    }) || null
+  );
 }
 
 // ============================
@@ -242,7 +248,7 @@ async function typeWord(word, delay = 150) {
   }
 
   KEYBOARD_MAP.enter?.click();
-  await new Promise((r) => setTimeout(r, 5000));
+  await new Promise((r) => setTimeout(r, 4000));
 }
 
 // ============================
@@ -267,7 +273,21 @@ async function waitForWordValidation(timeoutMs = 500) {
 
 function isGameWon() {
   const keyboard = document.getElementById("keyboard");
-  return keyboard?.firstElementChild?.classList.contains("alert-success") ?? false;
+  return (
+    keyboard?.firstElementChild?.classList.contains("alert-success") ?? false
+  );
+}
+
+function isGameLost() {
+  const keyboard = document.getElementById("keyboard");
+  return (
+    keyboard?.firstElementChild?.classList.contains("alert-danger") ?? false
+  );
+}
+
+function getSolutionWord() {
+  const keyboard = document.getElementById("keyboard");
+  return keyboard?.getElementsByTagName("STRONG")[0].textContent ?? null;
 }
 
 // ============================
@@ -279,6 +299,7 @@ async function startGame() {
   const invalidWords = loadInvalidWords();
   const lettersCount = getNumberOfLetters();
   const maxAttempts = getMaxAttempts();
+  const triedValidWords = new Set();
 
   const wordPool = allWords
     .filter((w) => w.length === lettersCount)
@@ -295,13 +316,18 @@ async function startGame() {
       updateGameState(gameState, data);
     }
 
-    const word = findNextCandidate(wordPool, gameState);
+    let word = findNextCandidate(wordPool, gameState, triedValidWords);
     if (!word) {
-      console.warn("Aucun mot valide trouvé !");
-      break;
+      console.warn(
+        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés."
+      );
+      if (triedValidWords.size > 0) {
+        word = triedValidWords.values().next().value;
+      } else {
+        console.error("Aucun mot déjà validé disponible.");
+        break;
+      }
     }
-
-    console.log(`📝 Attempt ${attempt + 1}: ${word}`);
     await typeWord(word);
 
     const valid = await waitForWordValidation();
@@ -312,6 +338,8 @@ async function startGame() {
       continue;
     }
 
+    triedValidWords.add(word);
+
     if (isGameWon()) {
       console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
       addValidWord(word);
@@ -320,4 +348,24 @@ async function startGame() {
 
     attempt++;
   }
+
+  if (isGameLost()) {
+    const solution = getSolutionWord();
+    console.log(`😞 Échec du jeu. La solution était : ${solution}`);
+    addValidWord(solution);
+  }
+
+  location.reload();
+}
+
+function startGameSafely() {
+  setTimeout(() => {
+    startGame().catch((err) => console.error(err));
+  }, 2000);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startGameSafely);
+} else {
+  startGameSafely();
 }
