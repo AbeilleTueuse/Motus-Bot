@@ -358,14 +358,4 @@ async function startGame() {
   location.reload();
 }
 
-function startGameSafely() {
-  setTimeout(() => {
-    startGame().catch((err) => console.error(err));
-  }, 2000);
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startGameSafely);
-} else {
-  startGameSafely();
-}
+startGame();
