@@ -1,18 +1,74 @@
+// ============================
+// 🔧 CONSTANTES ET CONFIG
+// ============================
+
 const GRID_CLASS = "motus-grille";
 const KEYBOARD_SELECTOR = "#keyboard .touche";
-const SPECIAL_KEYS = {
-  enter: "13",
-  backspace: "46"
-};
-const KEYBOARDS_MAP = buildKeyboardMap();
+const SPECIAL_KEYS = { enter: "13", backspace: "46" };
+const INVALID_WORDS_KEY = "motus_invalid_words";
+const VALID_WORDS_KEY = "motus_valid_words";
+const WORD_SOURCE_URL =
+  "https://raw.githubusercontent.com/AbeilleTueuse/Motus-Bot/refs/heads/main/french_words.txt";
+const PROXY_PREFIX = "https://corsproxy.io/?";
+
+// ============================
+// 💾 GESTION DU LOCALSTORAGE
+// ============================
+
+function loadInvalidWords() {
+  try {
+    const data = localStorage.getItem(INVALID_WORDS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveInvalidWords(words) {
+  const uniqueWords = Array.from(new Set(words));
+  localStorage.setItem(INVALID_WORDS_KEY, JSON.stringify(uniqueWords));
+}
+
+function addInvalidWord(word) {
+  const words = loadInvalidWords();
+  if (!words.includes(word)) {
+    words.push(word);
+    saveInvalidWords(words);
+  }
+}
+
+function loadValidWords() {
+  try {
+    const data = localStorage.getItem(VALID_WORDS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveValidWords(words) {
+  const uniqueWords = Array.from(new Set(words));
+  localStorage.setItem(VALID_WORDS_KEY, JSON.stringify(uniqueWords));
+}
+
+function addValidWord(word) {
+  const words = loadValidWords();
+  if (!words.includes(word)) {
+    words.push(word);
+    saveValidWords(words);
+  }
+}
+
+// ============================
+// 🎹 CLAVIER VIRTUEL
+// ============================
 
 function buildKeyboardMap() {
   const map = {};
 
-  document.querySelectorAll(KEYBOARD_SELECTOR).forEach(btn => {
+  document.querySelectorAll(KEYBOARD_SELECTOR).forEach((btn) => {
     const label = btn.textContent.trim().toLowerCase();
-
-    if (label && /^[a-z]$/.test(label)) {
+    if (/^[a-z]$/.test(label)) {
       map[label] = btn;
     }
   });
@@ -25,232 +81,243 @@ function buildKeyboardMap() {
   return Object.freeze(map);
 }
 
-async function getFrenchWordList() {
-    const url = "https://raw.githubusercontent.com/Taknok/French-Wordlist/master/francais.txt";
-    const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
+const KEYBOARD_MAP = buildKeyboardMap();
 
-    const response = await fetch(proxy);
-    if (!response.ok) {
-        throw new Error(`Erreur de téléchargement : ${response.status}`);
-    }
+// ============================
+// 📚 LISTE DES MOTS FRANÇAIS
+// ============================
 
-    const text = await response.text();
+async function fetchFrenchWordList() {
+  const url = PROXY_PREFIX + encodeURIComponent(WORD_SOURCE_URL);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Erreur de téléchargement : ${response.status}`);
 
-    const words = Array.from(
-        new Set(
-            text
-                .split(/\r?\n/)
-                .map(w => w.trim().toLowerCase())
-                .filter(w => w.length > 0 && !w.includes("-"))
+  const text = await response.text();
+
+  return Array.from(
+    new Set(
+      text
+        .split(/\r?\n/)
+        .map((w) =>
+          w
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/œ/g, "oe")
+            .replace(/æ/g, "ae")
         )
-    );
-
-    return words;
+        .filter((w) => w && !w.includes("-") && !w.includes(" "))
+    )
+  );
 }
 
-function waitForClassRemoval(el, className = "done", timeoutMs = 10000) {
-  return new Promise((resolve, reject) => {
-    if (!el) return reject(new Error("Element not found"));
+// ============================
+// 🧩 UTILITAIRES DE GRILLE
+// ============================
 
-    if (!el.classList.contains(className)) return resolve();
-
-    const observer = new MutationObserver((mutations) => {
-      if (!el.classList.contains(className)) {
-        observer.disconnect();
-        if (timer) clearTimeout(timer);
-        resolve();
-      }
-    });
-
-    observer.observe(el, { attributes: true, attributeFilter: ["class"] });
-
-    let timer = null;
-    if (timeoutMs > 0) {
-      timer = setTimeout(() => {
-        observer.disconnect();
-        reject(new Error(`Timeout: the class "${className}" is still present after ${timeoutMs} ms`));
-      }, timeoutMs);
-    }
-  });
+function getGrid() {
+  const grid = document.querySelector(`.${GRID_CLASS}`);
+  if (!grid) throw new Error(`Grid not found: ${GRID_CLASS}`);
+  return grid;
 }
 
 function getNumberOfLetters() {
-  const grid = document.querySelector(`.${GRID_CLASS}`);
-  if (!grid) throw new Error(`Grid not found: ${GRID_CLASS}`);
-
-  const firstRow = grid.firstElementChild;
-  if (!firstRow) throw new Error("First row of the grid is missing.");
-
+  const firstRow = getGrid().firstElementChild;
+  if (!firstRow) throw new Error("First row is missing.");
   return firstRow.children.length;
 }
 
 function getMaxAttempts() {
-    const grid = document.querySelector(`.${GRID_CLASS}`);
-    if (!grid) throw new Error(`Grid not found: ${GRID_CLASS}`);
-
-    const rows = Array.from(grid.children);
-    return rows.length;
-}
-
-async function typeWord(word, delay = 150) {
-    if (typeof word !== "string") {
-        throw new TypeError("The word must be a string.");
-    }
-
-    const letters = word.toLowerCase().split("");
-    const gridSize = getNumberOfLetters();
-
-    if (letters.length !== gridSize) {
-        console.warn(`⚠️ The word "${word}" does not match the required length (${gridSize} letters).`);
-    }
-
-    for (const letter of letters) {
-        const button = KEYBOARDS_MAP[letter];
-        if (!button) {
-            console.warn(`⚠️ Unknown or missing keyboard letter: "${letter}"`);
-            continue;
-        }
-
-        button.click();
-        await new Promise(res => setTimeout(res, delay));
-    }
-
-    // Press "Enter" at the end
-    const enterKey = KEYBOARDS_MAP.enter;
-    if (enterKey) enterKey.click();
-    else console.warn("⚠️ Enter key not found.");
-
-    await new Promise(res => setTimeout(res, 5000));
+  return getGrid().children.length;
 }
 
 function getRowData(row) {
-  if (!row) throw new Error("Row element not found");
+  if (!row) throw new Error("Row element not found.");
 
-  const data = [];
-
-  for (const cell of row.children) {
+  return Array.from(row.children).map((cell) => {
     const letter = cell.textContent.trim().toLowerCase();
+    const classList = cell.firstElementChild.classList;
 
     let status = "absent";
-    const classes = cell.firstElementChild.classList;
+    if (classList.contains("green")) status = "wellPlaced";
+    else if (classList.contains("orange")) status = "misplaced";
 
-    if (classes.contains("green")) {
-      status = "wellPlaced";
-    } else if (classes.contains("orange")) {
-      status = "misplaced";
-    }
-
-    data.push({ letter, status });
-  }
-
-  return data;
+    return { letter, status };
+  });
 }
 
-function getBestWord(wordList, gameState) {
-  for (const word of wordList) {
-    const letters = word.split("");
+// ============================
+// 🧠 LOGIQUE DU JEU
+// ============================
 
-    let isValid = true;
+function initializeGameStateFromGrid() {
+  const firstRow = getGrid().firstElementChild;
+  if (!firstRow) throw new Error("First row not found.");
 
-    for (const [index, letter] of Object.entries(gameState.wellPlaced)) {
-      if (letters[index] !== letter) {
-        isValid = false;
-        break;
-      }
-    }
-    if (!isValid) continue;
+  const gameState = {
+    wellPlaced: {},
+    misplaced: new Set(),
+    absent: new Set(),
+    excludedPositions: {},
+  };
 
-    for (const letter of gameState.misplaced) {
-      if (!letters.includes(letter)) {
-        isValid = false;
-        break;
-      }
+  Array.from(firstRow.children).forEach((cell, i) => {
+    const letter = cell.textContent.trim().toLowerCase();
+    if (letter && letter !== ".") gameState.wellPlaced[i] = letter;
+  });
 
-      const excluded = gameState.excludedPositions[letter] || [];
-      for (const pos of excluded) {
-        if (letters[pos] === letter) {
-          isValid = false;
-          break;
-        }
-      }
-      if (!isValid) break;
-    }
-    if (!isValid) continue;
-
-    for (const letter of gameState.absent) {
-      if (letters.includes(letter)) {
-        isValid = false;
-        break;
-      }
-    }
-    if (!isValid) continue;
-
-    return word;
-  }
-
-  return null;
+  return gameState;
 }
 
 function updateGameState(gameState, rowData) {
-  rowData.forEach((cell, index) => {
-    const { letter, status } = cell;
-
+  rowData.forEach(({ letter, status }, i) => {
     switch (status) {
       case "wellPlaced":
-        gameState.wellPlaced[index] = letter;
+        gameState.wellPlaced[i] = letter;
         gameState.absent.delete(letter);
         break;
 
       case "misplaced":
         gameState.misplaced.add(letter);
         gameState.absent.delete(letter);
-        if (!gameState.excludedPositions[letter]) {
-          gameState.excludedPositions[letter] = [];
-        }
-        gameState.excludedPositions[letter].push(index);
+        gameState.excludedPositions[letter] ||= [];
+        gameState.excludedPositions[letter].push(i);
         break;
 
       case "absent":
-        const foundElsewhere =
+        const known =
           Object.values(gameState.wellPlaced).includes(letter) ||
           gameState.misplaced.has(letter);
-
-        if (!foundElsewhere) {
-          gameState.absent.add(letter);
-        }
+        if (!known) gameState.absent.add(letter);
         break;
     }
   });
 }
 
+function findNextCandidate(wordList, gameState) {
+  return wordList.find((word) => {
+    const letters = word.split("");
+
+    // Lettres bien placées
+    for (const [i, l] of Object.entries(gameState.wellPlaced)) {
+      if (letters[i] !== l) return false;
+    }
+
+    // Lettres mal placées
+    for (const l of gameState.misplaced) {
+      if (!letters.includes(l)) return false;
+      const excluded = gameState.excludedPositions[l] || [];
+      if (excluded.some((pos) => letters[pos] === l)) return false;
+    }
+
+    // Lettres absentes
+    for (const l of gameState.absent) {
+      if (letters.includes(l)) return false;
+    }
+
+    return true;
+  }) || null;
+}
+
+// ============================
+// ⌨️ INTERACTION AVEC LE CLAVIER
+// ============================
+
+async function typeWord(word, delay = 150) {
+  if (typeof word !== "string") throw new TypeError("Word must be a string.");
+
+  const letters = word.toLowerCase().split("");
+  const expectedLength = getNumberOfLetters();
+
+  if (letters.length !== expectedLength) {
+    console.warn(`⚠️ "${word}" ne fait pas ${expectedLength} lettres.`);
+  }
+
+  for (const letter of letters) {
+    const key = KEYBOARD_MAP[letter];
+    if (key) key.click();
+    else console.warn(`⚠️ Lettre inconnue : "${letter}"`);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+
+  KEYBOARD_MAP.enter?.click();
+  await new Promise((r) => setTimeout(r, 5000));
+}
+
+// ============================
+// ✅ VALIDATION ET FIN DE PARTIE
+// ============================
+
+async function waitForWordValidation(timeoutMs = 500) {
+  return new Promise((resolve) => {
+    const alertBox = document.getElementById("alert");
+    if (!alertBox) return resolve(true);
+
+    const start = performance.now();
+    (function check() {
+      const invalid = alertBox.children.length > 0;
+      const elapsed = performance.now() - start;
+      if (invalid) return resolve(false);
+      if (elapsed > timeoutMs) return resolve(true);
+      requestAnimationFrame(check);
+    })();
+  });
+}
+
+function isGameWon() {
+  const keyboard = document.getElementById("keyboard");
+  return keyboard?.firstElementChild?.classList.contains("alert-success") ?? false;
+}
+
+// ============================
+// 🚀 BOUCLE PRINCIPALE DU JEU
+// ============================
 
 async function startGame() {
-    const wordList = await getFrenchWordList();
-    const numberOfLetters = getNumberOfLetters();
-    const maxAttempts = getMaxAttempts();
-    const filteredWords = wordList.filter(word => word.length === numberOfLetters);
-    let attemptCount = 0;
-    let gameState = {
-        wellPlaced: {},
-        misplaced: new Set(),
-        absent: new Set(),
-        excludedPositions: {},
-    };
+  const allWords = await fetchFrenchWordList();
+  const invalidWords = loadInvalidWords();
+  const lettersCount = getNumberOfLetters();
+  const maxAttempts = getMaxAttempts();
 
-    while (attemptCount < maxAttempts) {
-        const row = document.querySelector(`.${GRID_CLASS}`).children[attemptCount];
-        let word = filteredWords[0];
+  const wordPool = allWords
+    .filter((w) => w.length === lettersCount)
+    .filter((w) => !invalidWords.includes(w));
 
-        if (attemptCount > 0) {
-            const previousRow = document.querySelector(`.${GRID_CLASS}`).children[attemptCount - 1];
-            const data = getRowData(previousRow);
-            updateGameState(gameState, data);
-            word = getBestWord(filteredWords, gameState);
-        }
-        console.log(`Attempt ${attemptCount + 1}: Typing the word "${word}"`);
-        console.log("Current game state:", gameState);
-        await typeWord(word);
-        // await waitForClassRemoval(row.lastElementChild, "done");
-        attemptCount++;
+  const gameState = initializeGameStateFromGrid();
+
+  let attempt = 0;
+
+  while (attempt < maxAttempts) {
+    if (attempt > 0) {
+      const prevRow = getGrid().children[attempt - 1];
+      const data = getRowData(prevRow);
+      updateGameState(gameState, data);
     }
+
+    const word = findNextCandidate(wordPool, gameState);
+    if (!word) {
+      console.warn("Aucun mot valide trouvé !");
+      break;
+    }
+
+    console.log(`📝 Attempt ${attempt + 1}: ${word}`);
+    await typeWord(word);
+
+    const valid = await waitForWordValidation();
+    if (!valid) {
+      console.warn(`❌ "${word}" invalide.`);
+      addInvalidWord(word);
+      wordPool.splice(wordPool.indexOf(word), 1);
+      continue;
+    }
+
+    if (isGameWon()) {
+      console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
+      addValidWord(word);
+      break;
+    }
+
+    attempt++;
+  }
 }
