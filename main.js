@@ -195,7 +195,7 @@ function updateGameState(gameState, rowData) {
   });
 }
 
-function findNextCandidate(wordList, gameState, triedWords) {
+function findNextCandidate(wordList, gameState) {
   return (
     wordList.find((word) => {
       const letters = word.split("");
@@ -216,9 +216,6 @@ function findNextCandidate(wordList, gameState, triedWords) {
       for (const l of gameState.absent) {
         if (letters.includes(l)) return false;
       }
-
-      // Mot déjà essayé
-      if (triedWords.has(word)) return false;
 
       return true;
     }) || null
@@ -298,7 +295,7 @@ async function startGame() {
   const invalidWords = loadInvalidWords();
   const lettersCount = getNumberOfLetters();
   const maxAttempts = getMaxAttempts();
-  const triedValidWords = new Set();
+  let lastValidWord = null;
 
   const wordPool = allWords
     .filter((w) => w.length === lettersCount)
@@ -315,13 +312,13 @@ async function startGame() {
       updateGameState(gameState, data);
     }
 
-    let word = findNextCandidate(wordPool, gameState, triedValidWords);
+    let word = findNextCandidate(wordPool, gameState);
     if (!word) {
       console.warn(
         "Aucun mot valide trouvé ! Réessai avec des mots déjà validés."
       );
-      if (triedValidWords.size > 0) {
-        word = triedValidWords.values().next().value;
+      if (lastValidWord !== null) {
+        word = lastValidWord;
       } else {
         console.error("Aucun mot déjà validé disponible.");
         break;
@@ -337,7 +334,7 @@ async function startGame() {
       continue;
     }
 
-    triedValidWords.add(word);
+    lastValidWord = word;
 
     if (isGameWon()) {
       console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
