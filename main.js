@@ -298,6 +298,18 @@ function getTotalScore() {
   return parseInt(scoreElem.textContent.replace(/\s+/g, ""), 10);
 }
 
+function getMomScore() {
+  const container = document.querySelector(".motus.mx-auto.mt-5.text-center");
+
+  for (const child of container.children) {
+    if (child.textContent.includes("Laziza65")) {
+      const score = child.getElementsByTagName("STRONG")[0].textContent;
+      return parseInt(score.replace(/\s+/g, ""), 10);
+    }
+  }
+  return 0;
+}
+
 // ============================
 // 🚀 BOUCLE PRINCIPALE DU JEU
 // ============================
@@ -316,7 +328,7 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  if (score >= 329170) {
+  if (score >= getMomScore()) {
     return;
   }
 
