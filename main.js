@@ -195,7 +195,7 @@ function updateGameState(gameState, rowData) {
   });
 }
 
-function findNextCandidate(wordList, gameState) {
+function findNextCandidate(wordList, gameState, validAnswers) {
   return (
     wordList.find((word) => {
       const letters = word.split("");
@@ -216,6 +216,9 @@ function findNextCandidate(wordList, gameState) {
       for (const l of gameState.absent) {
         if (letters.includes(l)) return false;
       }
+
+      // Vérifier les mots déjà validés
+      if (validAnswers.includes(word)) return false;
 
       return true;
     }) || null
@@ -295,7 +298,7 @@ async function startGame() {
   const invalidWords = loadInvalidWords();
   const lettersCount = getNumberOfLetters();
   const maxAttempts = getMaxAttempts();
-  let lastValidWord = null;
+  const validAnswers = [];
 
   const wordPool = allWords
     .filter((w) => w.length === lettersCount)
@@ -312,13 +315,13 @@ async function startGame() {
       updateGameState(gameState, data);
     }
 
-    let word = findNextCandidate(wordPool, gameState);
+    let word = findNextCandidate(wordPool, gameState, validAnswers);
     if (!word) {
       console.warn(
         "Aucun mot valide trouvé ! Réessai avec des mots déjà validés."
       );
-      if (lastValidWord !== null) {
-        word = lastValidWord;
+      if (validAnswers.length > 0) {
+        word = validAnswers[0];
       } else {
         console.error("Aucun mot déjà validé disponible.");
         break;
@@ -334,7 +337,7 @@ async function startGame() {
       continue;
     }
 
-    lastValidWord = word;
+    validAnswers.push(word);
 
     if (isGameWon()) {
       console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
@@ -351,7 +354,7 @@ async function startGame() {
     addValidWord(solution);
   }
 
-  location.reload();
+  // location.reload();
 }
 
 console.clear();
