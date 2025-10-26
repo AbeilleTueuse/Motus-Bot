@@ -8,7 +8,7 @@ const SPECIAL_KEYS = { enter: "13", backspace: "46" };
 const INVALID_WORDS_KEY = "motus_invalid_words";
 const VALID_WORDS_KEY = "motus_valid_words";
 const WORD_SOURCE_URL =
-  "https://raw.githubusercontent.com/AbeilleTueuse/Motus-Bot/refs/heads/main/french_words.txt";
+  "https://raw.githubusercontent.com/lorenbrichter/Words/refs/heads/master/Words/fr.txt";
 const PROXY_PREFIX = "https://corsproxy.io/?";
 
 // ============================
