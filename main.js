@@ -358,5 +358,5 @@ async function startGame() {
   location.reload();
 }
 
-clear();
+console.clear();
 startGame();
