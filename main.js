@@ -358,4 +358,4 @@ async function startGame() {
   location.reload();
 }
 
-startGame();
+await startGame();
