@@ -328,7 +328,7 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  if (score >= getMomScore()) {
+  if (score >= getMomScore() + 10_000) {
     return;
   }
 
