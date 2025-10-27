@@ -328,9 +328,14 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  if (score >= getMomScore() + 5_000) {
-    return;
-  }
+  // if (score >= getMomScore() + 5_000) {
+  //   return;
+  // }
+
+    if (score >= 400_000) {
+      return;
+    }
+
 
   let attempt = 0;
 
@@ -368,6 +373,10 @@ async function startGame() {
     if (isGameWon()) {
       console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
       addValidWord(word);
+      break;
+    }
+
+    if (attempt >= 1) {
       break;
     }
 
