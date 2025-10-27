@@ -376,10 +376,6 @@ async function startGame() {
       break;
     }
 
-    if (attempt >= 1) {
-      break;
-    }
-
     attempt++;
   }
 
