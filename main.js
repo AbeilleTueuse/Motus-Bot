@@ -171,6 +171,15 @@ function initializeGameStateFromGrid() {
 }
 
 function updateGameState(gameState, rowData) {
+  const counts = {};
+
+  // Compter les occurrences bien/mal placées
+  rowData.forEach(({ letter, status }) => {
+    if (status === "wellPlaced" || status === "misplaced") {
+      counts[letter] = (counts[letter] || 0) + 1;
+    }
+  });
+
   rowData.forEach(({ letter, status }, i) => {
     switch (status) {
       case "wellPlaced":
@@ -186,10 +195,12 @@ function updateGameState(gameState, rowData) {
         break;
 
       case "absent":
-        const known =
-          Object.values(gameState.wellPlaced).includes(letter) ||
-          gameState.misplaced.has(letter);
-        if (!known) gameState.absent.add(letter);
+        if (!counts[letter]) {
+          gameState.absent.add(letter);
+        } else {
+          gameState.maxOccurrences ||= {};
+          gameState.maxOccurrences[letter] = counts[letter];
+        }
         break;
     }
   });
@@ -215,6 +226,14 @@ function findNextCandidate(wordList, gameState, validAnswers) {
       // Lettres absentes
       for (const l of gameState.absent) {
         if (letters.includes(l)) return false;
+      }
+
+      // Trop d'occurrences d'une même lettre
+      if (gameState.maxOccurrences) {
+        for (const [l, max] of Object.entries(gameState.maxOccurrences)) {
+          const count = letters.filter((x) => x === l).length;
+          if (count > max) return false;
+        }
       }
 
       // Vérifier les mots déjà validés
@@ -332,10 +351,9 @@ async function startGame() {
   //   return;
   // }
 
-    if (score >= 400_000) {
-      return;
-    }
-
+  if (score >= 400_000) {
+    return;
+  }
 
   let attempt = 0;
 
