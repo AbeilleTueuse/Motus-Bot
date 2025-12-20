@@ -378,13 +378,13 @@ async function startGame() {
     }
     await typeWord(word);
 
-    const valid = await waitForWordValidation();
-    if (!valid) {
-      console.warn(`❌ "${word}" invalide.`);
-      addInvalidWord(word);
-      wordPool.splice(wordPool.indexOf(word), 1);
-      continue;
-    }
+    // const valid = await waitForWordValidation();
+    // if (!valid) {
+    //   console.warn(`❌ "${word}" invalide.`);
+    //   addInvalidWord(word);
+    //   wordPool.splice(wordPool.indexOf(word), 1);
+    //   continue;
+    // }
 
     validAnswers.push(word);
 
