@@ -248,7 +248,7 @@ function findNextCandidate(wordList, gameState, validAnswers) {
 // ⌨️ INTERACTION AVEC LE CLAVIER
 // ============================
 
-async function typeWord(word, delay = 150) {
+async function typeWord(word, delay = 50) {
   if (typeof word !== "string") throw new TypeError("Word must be a string.");
 
   const letters = word.toLowerCase().split("");
