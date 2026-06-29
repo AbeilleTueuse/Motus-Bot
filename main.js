@@ -350,9 +350,9 @@ async function startGame() {
   //   return;
   // }
 
-  // if (score >= 400_000) {
-  //   return;
-  // }
+  if (score >= 450_000) {
+    return;
+  }
 
   let attempt = 0;
 
