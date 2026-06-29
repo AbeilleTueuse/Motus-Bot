@@ -9,7 +9,6 @@ const INVALID_WORDS_KEY = "motus_invalid_words";
 const VALID_WORDS_KEY = "motus_valid_words";
 const WORD_SOURCE_URL =
   "https://raw.githubusercontent.com/lorenbrichter/Words/refs/heads/master/Words/fr.txt";
-const PROXY_PREFIX = "https://corsproxy.io/?";
 
 // ============================
 // 💾 GESTION DU LOCALSTORAGE
@@ -88,8 +87,8 @@ const KEYBOARD_MAP = buildKeyboardMap();
 // ============================
 
 async function fetchFrenchWordList() {
-  const url = PROXY_PREFIX + encodeURIComponent(WORD_SOURCE_URL);
-  const response = await fetch(url);
+  const response = await fetch(WORD_SOURCE_URL);
+  
   if (!response.ok)
     throw new Error(`Erreur de téléchargement : ${response.status}`);
 
