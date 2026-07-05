@@ -88,7 +88,7 @@ const KEYBOARD_MAP = buildKeyboardMap();
 
 async function fetchFrenchWordList() {
   const response = await fetch(WORD_SOURCE_URL);
-  
+
   if (!response.ok)
     throw new Error(`Erreur de téléchargement : ${response.status}`);
 
@@ -104,7 +104,7 @@ async function fetchFrenchWordList() {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/œ/g, "oe")
-        .replace(/æ/g, "ae")
+        .replace(/æ/g, "ae"),
     )
     .filter((w) => w && /^[a-z]+$/.test(w));
 
@@ -316,16 +316,31 @@ function getTotalScore() {
   return parseInt(scoreElem.textContent.replace(/\s+/g, ""), 10);
 }
 
-function getMomScore() {
-  const container = document.querySelector(".motus.mx-auto.mt-5.text-center");
+function getPlayerScore(playerName) {
+  const nameContainers = document.querySelectorAll(".flex-grow-1.text-start");
 
-  for (const child of container.children) {
-    if (child.textContent.includes("Laziza65")) {
-      const score = child.getElementsByTagName("STRONG")[0].textContent;
-      return parseInt(score.replace(/\s+/g, ""), 10);
+  for (let i = 0; i < nameContainers.length; i++) {
+    const container = nameContainers[i];
+
+    const currentPlayer = container.childNodes[0].textContent.trim();
+
+    if (currentPlayer.toLowerCase() === playerName.toLowerCase()) {
+      const scoreContainer = container.nextElementSibling;
+
+      if (scoreContainer && scoreContainer.classList.contains("text-end")) {
+        const scoreElement = scoreContainer.firstElementChild;
+
+        if (scoreElement) {
+          let rawScoreText = scoreElement.textContent;
+          let cleanScore = rawScoreText.replace(/pts/gi, "").replace(/\s/g, "");
+
+          return parseInt(cleanScore, 10);
+        }
+      }
     }
   }
-  return 0;
+
+  return null;
 }
 
 // ============================
@@ -346,13 +361,15 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  // if (score >= getMomScore() + 5_000) {
-  //   return;
-  // }
+  console.log(getPlayerScore("marius"));
 
-  if (score >= 450_000) {
+  if (score >= getPlayerScore("marius") + 5_000) {
     return;
   }
+
+  // if (score >= 450_000) {
+  //   return;
+  // }
 
   let attempt = 0;
 
@@ -366,7 +383,7 @@ async function startGame() {
     let word = findNextCandidate(wordPool, gameState, validAnswers);
     if (!word) {
       console.warn(
-        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés."
+        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés.",
       );
       if (validAnswers.length > 0) {
         word = validAnswers[0];
