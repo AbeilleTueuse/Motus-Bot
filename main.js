@@ -361,11 +361,9 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  console.log(getPlayerScore("marius"));
-
-  if (score >= getPlayerScore("marius") + 5_000) {
-    return;
-  }
+  // if (score >= getPlayerScore("marius") + 5_000) {
+  //   return;
+  // }
 
   // if (score >= 450_000) {
   //   return;
