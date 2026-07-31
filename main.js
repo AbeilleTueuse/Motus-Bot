@@ -361,7 +361,7 @@ async function startGame() {
   const gameState = initializeGameStateFromGrid();
   const score = getTotalScore();
 
-  if (score >= getPlayerScore("nathalie") + 5_000) {
+  if (score >= getPlayerScore("nathalie") + 10_000) {
     return;
   }
 
