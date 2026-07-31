@@ -1,5 +1,5 @@
 // ============================
-// 🔧 CONSTANTES ET CONFIG
+// 🔧 CONSTANTS AND CONFIG
 // ============================
 
 const GRID_CLASS = "motus-grille";
@@ -11,7 +11,226 @@ const WORD_SOURCE_URL =
   "https://raw.githubusercontent.com/lorenbrichter/Words/refs/heads/master/Words/fr.txt";
 
 // ============================
-// 💾 GESTION DU LOCALSTORAGE
+// ⚙️ BOT CONFIGURATION & UI
+// ============================
+
+const CONFIG_KEY = "motus_bot_config";
+
+const DEFAULT_CONFIG = {
+  isPaused: false,
+  enableTargetPlayer: true,
+  targetPlayerName: "nathalie",
+  targetScoreMargin: 10000,
+  enableMaxScore: false,
+  maxScoreValue: 450000
+};
+
+function loadConfig() {
+  try {
+    const data = localStorage.getItem(CONFIG_KEY);
+    return data ? { ...DEFAULT_CONFIG, ...JSON.parse(data) } : DEFAULT_CONFIG;
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+function saveConfig(config) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+// Global function to update the visual status of the bot
+function updateBotStatus(message, color = "#0d6efd") {
+  const statusEl = document.getElementById("bot-status-text");
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.style.color = color;
+  }
+}
+
+function injectSettingsUI() {
+  const config = loadConfig();
+
+  const container = document.createElement("div");
+  container.id = "motus-bot-container";
+  container.style.position = "fixed";
+  container.style.top = "10px";
+  container.style.right = "10px";
+  container.style.zIndex = "99999";
+  container.style.backgroundColor = "#ffffff";
+  container.style.padding = "20px";
+  container.style.border = "1px solid #ced4da";
+  container.style.borderRadius = "12px";
+  container.style.boxShadow = "0 8px 16px rgba(0,0,0,0.15)";
+  container.style.fontFamily = "Arial, sans-serif";
+  container.style.fontSize = "13px";
+  container.style.color = "#333";
+  container.style.width = "290px";
+
+  // Inject CSS for custom toggle switches, inputs, and hover alerts
+  const style = document.createElement("style");
+  style.textContent = `
+    .motus-bot-toggle {
+      position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0;
+    }
+    .motus-bot-toggle input { opacity: 0; width: 0; height: 0; }
+    .motus-bot-slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc; transition: .3s; border-radius: 20px;
+    }
+    .motus-bot-slider:before {
+      position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    .motus-bot-toggle input:checked + .motus-bot-slider { background-color: #198754; }
+    .motus-bot-toggle input:checked + .motus-bot-slider:before { transform: translateX(16px); }
+    
+    .motus-bot-input {
+      width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; transition: .3s;
+    }
+    .motus-bot-input:focus { border-color: #0d6efd; outline: none; }
+    .motus-bot-row { margin-bottom: 15px; }
+    .motus-bot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .motus-bot-desc { font-size: 11px; color: #6c757d; margin-bottom: 8px; line-height: 1.3; }
+    
+    .motus-bot-status-box {
+      background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center; 
+      margin-bottom: 15px; border: 1px solid #dee2e6;
+    }
+    
+    .motus-bot-hover-alert {
+      display: none; font-size: 11px; color: #d63384; margin-top: 15px; 
+      text-align: center; font-style: italic; background: #fff0f6; 
+      padding: 8px; border-radius: 6px; border: 1px solid #ffcce0;
+    }
+    #motus-bot-container:hover .motus-bot-hover-alert {
+      display: block;
+    }
+  `;
+  document.head.appendChild(style);
+
+  container.innerHTML = `
+    <h3 style="margin: 0 0 15px 0; font-size: 16px; text-align: center; color: #212529;">🤖 Configuration du Bot</h3>
+    
+    <!-- Real-time Status Display -->
+    <div class="motus-bot-status-box">
+      <strong style="color: #495057;">Statut :</strong><br>
+      <span id="bot-status-text" style="font-weight: bold; color: #0d6efd; font-size: 14px; display: inline-block; margin-top: 4px;">Initialisation...</span>
+    </div>
+    
+    <div class="motus-bot-row">
+      <div class="motus-bot-header">
+        <strong>Mettre en pause</strong>
+        <label class="motus-bot-toggle">
+          <input type="checkbox" id="bot-pause" ${config.isPaused ? "checked" : ""}>
+          <span class="motus-bot-slider"></span>
+        </label>
+      </div>
+      <div class="motus-bot-desc">Stoppe temporairement le bot. Prend effet immédiatement, même en plein milieu d'une partie.</div>
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+    
+    <div class="motus-bot-row">
+      <div class="motus-bot-header">
+        <strong>Dépasser un joueur</strong>
+        <label class="motus-bot-toggle">
+          <input type="checkbox" id="bot-enable-player" ${config.enableTargetPlayer ? "checked" : ""}>
+          <span class="motus-bot-slider"></span>
+        </label>
+      </div>
+      <div class="motus-bot-desc">Arrête de jouer automatiquement une fois que le score de ce joueur est dépassé.</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <input type="text" id="bot-target-name" class="motus-bot-input" value="${config.targetPlayerName}" placeholder="Pseudo du joueur ciblé">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="number" id="bot-target-margin" class="motus-bot-input" value="${config.targetScoreMargin}" placeholder="10000" style="width: 100px;">
+          <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">points d'avance requis</span>
+        </div>
+      </div>
+    </div>
+    
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+    
+    <div class="motus-bot-row" style="margin-bottom: 0;">
+      <div class="motus-bot-header">
+        <strong>Limite de score max</strong>
+        <label class="motus-bot-toggle">
+          <input type="checkbox" id="bot-enable-max" ${config.enableMaxScore ? "checked" : ""}>
+          <span class="motus-bot-slider"></span>
+        </label>
+      </div>
+      <div class="motus-bot-desc">Arrête le bot définitivement si votre propre score atteint ce palier.</div>
+      <input type="number" id="bot-max-score" class="motus-bot-input" value="${config.maxScoreValue}" placeholder="Score maximum">
+    </div>
+    
+    <!-- Warning shown only on hover -->
+    <div class="motus-bot-hover-alert">
+      ⚠️ Le rechargement de la page est suspendu tant que votre souris est sur ce menu.
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  // Automatically applies UI state (disabling and opacity) based on checkboxes
+  const applyUIState = () => {
+    const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
+    const nameInput = document.getElementById("bot-target-name");
+    const marginInput = document.getElementById("bot-target-margin");
+    
+    nameInput.disabled = !isPlayerEnabled;
+    marginInput.disabled = !isPlayerEnabled;
+    nameInput.style.opacity = isPlayerEnabled ? "1" : "0.5";
+    marginInput.style.opacity = isPlayerEnabled ? "1" : "0.5";
+    nameInput.parentElement.style.opacity = isPlayerEnabled ? "1" : "0.5";
+
+    const isMaxEnabled = document.getElementById("bot-enable-max").checked;
+    const maxInput = document.getElementById("bot-max-score");
+    
+    maxInput.disabled = !isMaxEnabled;
+    maxInput.style.opacity = isMaxEnabled ? "1" : "0.5";
+  };
+
+  // Run once on load to set initial visual state
+  applyUIState();
+
+  // Save changes automatically whenever any input is modified
+  container.addEventListener("input", () => {
+    const newConfig = {
+      isPaused: document.getElementById("bot-pause").checked,
+      enableTargetPlayer: document.getElementById("bot-enable-player").checked,
+      targetPlayerName: document.getElementById("bot-target-name").value.trim(),
+      targetScoreMargin: parseInt(document.getElementById("bot-target-margin").value, 10) || 0,
+      enableMaxScore: document.getElementById("bot-enable-max").checked,
+      maxScoreValue: parseInt(document.getElementById("bot-max-score").value, 10) || 0
+    };
+    saveConfig(newConfig);
+    applyUIState();
+  });
+
+  // Block page reload while user is interacting with settings
+  const blockReload = () => { window.isEditingBotConfig = true; };
+  const allowReload = () => { window.isEditingBotConfig = false; };
+
+  container.addEventListener("mouseenter", blockReload);
+  container.addEventListener("mouseleave", allowReload);
+  container.addEventListener("focusin", blockReload);
+  container.addEventListener("focusout", allowReload);
+}
+
+async function triggerSafeReload() {
+  if (window.isEditingBotConfig) {
+    updateBotStatus("Attente de la fermeture du menu...", "#fd7e14");
+  }
+  
+  while (window.isEditingBotConfig) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  
+  updateBotStatus("Rechargement de la page...", "#0d6efd");
+  location.reload();
+}
+
+// ============================
+// 💾 LOCALSTORAGE MANAGEMENT
 // ============================
 
 function loadInvalidWords() {
@@ -59,7 +278,7 @@ function addValidWord(word) {
 }
 
 // ============================
-// 🎹 CLAVIER VIRTUEL
+// 🎹 VIRTUAL KEYBOARD
 // ============================
 
 function buildKeyboardMap() {
@@ -83,7 +302,7 @@ function buildKeyboardMap() {
 const KEYBOARD_MAP = buildKeyboardMap();
 
 // ============================
-// 📚 LISTE DES MOTS FRANÇAIS
+// 📚 FRENCH WORD LIST
 // ============================
 
 async function fetchFrenchWordList() {
@@ -112,7 +331,7 @@ async function fetchFrenchWordList() {
 }
 
 // ============================
-// 🧩 UTILITAIRES DE GRILLE
+// 🧩 GRID UTILITIES
 // ============================
 
 function getGrid() {
@@ -147,7 +366,7 @@ function getRowData(row) {
 }
 
 // ============================
-// 🧠 LOGIQUE DU JEU
+// 🧠 GAME LOGIC
 // ============================
 
 function initializeGameStateFromGrid() {
@@ -172,7 +391,6 @@ function initializeGameStateFromGrid() {
 function updateGameState(gameState, rowData) {
   const counts = {};
 
-  // Compter les occurrences bien/mal placées
   rowData.forEach(({ letter, status }) => {
     if (status === "wellPlaced" || status === "misplaced") {
       counts[letter] = (counts[letter] || 0) + 1;
@@ -185,14 +403,12 @@ function updateGameState(gameState, rowData) {
         gameState.wellPlaced[i] = letter;
         gameState.absent.delete(letter);
         break;
-
       case "misplaced":
         gameState.misplaced.add(letter);
         gameState.absent.delete(letter);
         gameState.excludedPositions[letter] ||= [];
         gameState.excludedPositions[letter].push(i);
         break;
-
       case "absent":
         if (!counts[letter]) {
           gameState.absent.add(letter);
@@ -210,24 +426,20 @@ function findNextCandidate(wordList, gameState, validAnswers) {
     wordList.find((word) => {
       const letters = word.split("");
 
-      // Lettres bien placées
       for (const [i, l] of Object.entries(gameState.wellPlaced)) {
         if (letters[i] !== l) return false;
       }
 
-      // Lettres mal placées
       for (const l of gameState.misplaced) {
         if (!letters.includes(l)) return false;
         const excluded = gameState.excludedPositions[l] || [];
         if (excluded.some((pos) => letters[pos] === l)) return false;
       }
 
-      // Lettres absentes
       for (const l of gameState.absent) {
         if (letters.includes(l)) return false;
       }
 
-      // Trop d'occurrences d'une même lettre
       if (gameState.maxOccurrences) {
         for (const [l, max] of Object.entries(gameState.maxOccurrences)) {
           const count = letters.filter((x) => x === l).length;
@@ -235,7 +447,6 @@ function findNextCandidate(wordList, gameState, validAnswers) {
         }
       }
 
-      // Vérifier les mots déjà validés
       if (validAnswers.includes(word)) return false;
 
       return true;
@@ -244,7 +455,7 @@ function findNextCandidate(wordList, gameState, validAnswers) {
 }
 
 // ============================
-// ⌨️ INTERACTION AVEC LE CLAVIER
+// ⌨️ KEYBOARD INTERACTION
 // ============================
 
 async function typeWord(word, delay = 50) {
@@ -269,7 +480,7 @@ async function typeWord(word, delay = 50) {
 }
 
 // ============================
-// ✅ VALIDATION ET FIN DE PARTIE
+// ✅ VALIDATION & ENDGAME
 // ============================
 
 async function waitForWordValidation(timeoutMs = 500) {
@@ -312,6 +523,7 @@ function getTotalScore() {
 
   if (!scoreElem) {
     console.warn("Élément de score non trouvé.");
+    return 0;
   }
   return parseInt(scoreElem.textContent.replace(/\s+/g, ""), 10);
 }
@@ -321,7 +533,6 @@ function getPlayerScore(playerName) {
 
   for (let i = 0; i < nameContainers.length; i++) {
     const container = nameContainers[i];
-
     const currentPlayer = container.childNodes[0].textContent.trim();
 
     if (currentPlayer.toLowerCase() === playerName.toLowerCase()) {
@@ -333,7 +544,6 @@ function getPlayerScore(playerName) {
         if (scoreElement) {
           let rawScoreText = scoreElement.textContent;
           let cleanScore = rawScoreText.replace(/pts/gi, "").replace(/\s/g, "");
-
           return parseInt(cleanScore, 10);
         }
       }
@@ -344,10 +554,13 @@ function getPlayerScore(playerName) {
 }
 
 // ============================
-// 🚀 BOUCLE PRINCIPALE DU JEU
+// 🚀 MAIN GAME LOOP
 // ============================
 
 async function startGame() {
+  injectSettingsUI();
+  updateBotStatus("Téléchargement du dictionnaire...", "#0d6efd");
+
   const allWords = await fetchFrenchWordList();
   const invalidWords = loadInvalidWords();
   const lettersCount = getNumberOfLetters();
@@ -359,51 +572,69 @@ async function startGame() {
     .filter((w) => !invalidWords.includes(w));
 
   const gameState = initializeGameStateFromGrid();
-  const score = getTotalScore();
-
-  if (score >= getPlayerScore("nathalie") + 10_000) {
-    return;
-  }
-
-  // if (score >= 450_000) {
-  //   return;
-  // }
-
   let attempt = 0;
 
   while (attempt < maxAttempts) {
+    let wasPaused = false;
+
+    while (loadConfig().isPaused) {
+      updateBotStatus("⏸️ Bot en pause", "#dc3545");
+      wasPaused = true;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (wasPaused) updateBotStatus("Reprise de la partie...", "#198754");
+
+    const config = loadConfig();
+    const currentScore = getTotalScore();
+
+    if (config.enableTargetPlayer) {
+      const targetScore = getPlayerScore(config.targetPlayerName);
+      if (targetScore !== null && currentScore >= targetScore + config.targetScoreMargin) {
+        updateBotStatus(`🎯 Cible dépassée (${config.targetPlayerName})`, "#6f42c1");
+        return; 
+      }
+    }
+
+    if (config.enableMaxScore && currentScore >= config.maxScoreValue) {
+      updateBotStatus(`🏆 Score limite atteint`, "#6f42c1");
+      return;
+    }
+
     if (attempt > 0) {
       const prevRow = getGrid().children[attempt - 1];
       const data = getRowData(prevRow);
       updateGameState(gameState, data);
     }
 
+    updateBotStatus("Recherche du meilleur mot...", "#0d6efd");
     let word = findNextCandidate(wordPool, gameState, validAnswers);
+    
     if (!word) {
-      console.warn(
-        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés.",
-      );
+      console.warn("Aucun mot valide trouvé ! Réessai avec des mots déjà validés.");
       if (validAnswers.length > 0) {
         word = validAnswers[0];
       } else {
-        console.error("Aucun mot déjà validé disponible.");
+        updateBotStatus("❌ Dictionnaire épuisé", "#dc3545");
         break;
       }
     }
+    
+    updateBotStatus(`Saisie du mot : ${word.toUpperCase()}`, "#fd7e14");
     await typeWord(word);
 
-    // const valid = await waitForWordValidation();
-    // if (!valid) {
-    //   console.warn(`❌ "${word}" invalide.`);
-    //   addInvalidWord(word);
-    //   wordPool.splice(wordPool.indexOf(word), 1);
-    //   continue;
-    // }
+    updateBotStatus("Vérification du résultat...", "#0d6efd");
+    const valid = await waitForWordValidation();
+    if (!valid) {
+      console.warn(`❌ "${word}" invalide.`);
+      addInvalidWord(word);
+      wordPool.splice(wordPool.indexOf(word), 1);
+      continue;
+    }
 
     validAnswers.push(word);
 
     if (isGameWon()) {
-      console.log(`🎉 Mot trouvé en ${attempt + 1} essais !`);
+      updateBotStatus(`🎉 Mot trouvé ! (${attempt + 1}/${maxAttempts})`, "#198754");
       addValidWord(word);
       break;
     }
@@ -413,11 +644,11 @@ async function startGame() {
 
   if (isGameLost()) {
     const solution = getSolutionWord();
-    console.log(`😞 Échec du jeu. La solution était : ${solution}`);
-    addValidWord(solution);
+    updateBotStatus(`😞 Perdu. Solution : ${solution}`, "#dc3545");
+    if (solution) addValidWord(solution);
   }
 
-  location.reload();
+  await triggerSafeReload();
 }
 
 console.clear();
