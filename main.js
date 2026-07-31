@@ -22,7 +22,9 @@ const DEFAULT_CONFIG = {
   targetPlayerName: "nathalie",
   targetScoreMargin: 10000,
   enableMaxScore: false,
-  maxScoreValue: 450000
+  maxScoreValue: 450000,
+  panelTop: "10px",
+  panelLeft: "10px",
 };
 
 function loadConfig() {
@@ -38,7 +40,6 @@ function saveConfig(config) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 
-// Global function to update the visual status of the bot
 function updateBotStatus(message, color = "#0d6efd") {
   const statusEl = document.getElementById("bot-status-text");
   if (statusEl) {
@@ -53,11 +54,10 @@ function injectSettingsUI() {
   const container = document.createElement("div");
   container.id = "motus-bot-container";
   container.style.position = "fixed";
-  container.style.top = "10px";
-  container.style.right = "10px";
+  container.style.top = config.panelTop;
+  container.style.left = config.panelLeft;
   container.style.zIndex = "99999";
   container.style.backgroundColor = "#ffffff";
-  container.style.padding = "20px";
   container.style.border = "1px solid #ced4da";
   container.style.borderRadius = "12px";
   container.style.boxShadow = "0 8px 16px rgba(0,0,0,0.15)";
@@ -65,8 +65,9 @@ function injectSettingsUI() {
   container.style.fontSize = "13px";
   container.style.color = "#333";
   container.style.width = "290px";
+  container.style.display = "flex";
+  container.style.flexDirection = "column";
 
-  // Inject CSS for custom toggle switches, inputs, and hover alerts
   const style = document.createElement("style");
   style.textContent = `
     .motus-bot-toggle {
@@ -105,77 +106,136 @@ function injectSettingsUI() {
     #motus-bot-container:hover .motus-bot-hover-alert {
       display: block;
     }
+
+    /* Styles for the draggable handle */
+    .motus-bot-drag-handle {
+      cursor: grab;
+      background-color: #f1f3f5;
+      padding: 12px;
+      border-radius: 12px 12px 0 0;
+      border-bottom: 1px solid #ced4da;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+    }
+    .motus-bot-drag-handle:active {
+      cursor: grabbing;
+    }
   `;
   document.head.appendChild(style);
 
   container.innerHTML = `
-    <h3 style="margin: 0 0 15px 0; font-size: 16px; text-align: center; color: #212529;">🤖 Configuration du Bot</h3>
-    
-    <!-- Real-time Status Display -->
-    <div class="motus-bot-status-box">
-      <strong style="color: #495057;">Statut :</strong><br>
-      <span id="bot-status-text" style="font-weight: bold; color: #0d6efd; font-size: 14px; display: inline-block; margin-top: 4px;">Initialisation...</span>
+    <div id="motus-bot-drag-handle" class="motus-bot-drag-handle">
+      <h3 style="margin: 0; font-size: 16px; color: #212529;">🤖 Configuration du Bot</h3>
     </div>
     
-    <div class="motus-bot-row">
-      <div class="motus-bot-header">
-        <strong>Mettre en pause</strong>
-        <label class="motus-bot-toggle">
-          <input type="checkbox" id="bot-pause" ${config.isPaused ? "checked" : ""}>
-          <span class="motus-bot-slider"></span>
-        </label>
+    <div style="padding: 20px;">
+      <!-- Real-time Status Display -->
+      <div class="motus-bot-status-box">
+        <strong style="color: #495057;">Statut :</strong><br>
+        <span id="bot-status-text" style="font-weight: bold; color: #0d6efd; font-size: 14px; display: inline-block; margin-top: 4px;">Initialisation...</span>
       </div>
-      <div class="motus-bot-desc">Stoppe temporairement le bot. Prend effet immédiatement, même en plein milieu d'une partie.</div>
-    </div>
-    
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-    
-    <div class="motus-bot-row">
-      <div class="motus-bot-header">
-        <strong>Dépasser un joueur</strong>
-        <label class="motus-bot-toggle">
-          <input type="checkbox" id="bot-enable-player" ${config.enableTargetPlayer ? "checked" : ""}>
-          <span class="motus-bot-slider"></span>
-        </label>
+      
+      <div class="motus-bot-row">
+        <div class="motus-bot-header">
+          <strong>Mettre en pause</strong>
+          <label class="motus-bot-toggle">
+            <input type="checkbox" id="bot-pause" ${config.isPaused ? "checked" : ""}>
+            <span class="motus-bot-slider"></span>
+          </label>
+        </div>
+        <div class="motus-bot-desc">Stoppe temporairement le bot. Prend effet immédiatement, même en plein milieu d'une partie.</div>
       </div>
-      <div class="motus-bot-desc">Arrête de jouer automatiquement une fois que le score de ce joueur est dépassé.</div>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <input type="text" id="bot-target-name" class="motus-bot-input" value="${config.targetPlayerName}" placeholder="Pseudo du joueur ciblé">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <input type="number" id="bot-target-margin" class="motus-bot-input" value="${config.targetScoreMargin}" placeholder="10000" style="width: 100px;">
-          <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">points d'avance requis</span>
+      
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+      
+      <div class="motus-bot-row">
+        <div class="motus-bot-header">
+          <strong>Dépasser un joueur</strong>
+          <label class="motus-bot-toggle">
+            <input type="checkbox" id="bot-enable-player" ${config.enableTargetPlayer ? "checked" : ""}>
+            <span class="motus-bot-slider"></span>
+          </label>
+        </div>
+        <div class="motus-bot-desc">Arrête de jouer automatiquement une fois que le score de ce joueur est dépassé.</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <input type="text" id="bot-target-name" class="motus-bot-input" value="${config.targetPlayerName}" placeholder="Pseudo du joueur ciblé">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="number" id="bot-target-margin" class="motus-bot-input" value="${config.targetScoreMargin}" placeholder="10000" style="width: 100px;">
+            <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">points d'avance requis</span>
+          </div>
         </div>
       </div>
-    </div>
-    
-    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-    
-    <div class="motus-bot-row" style="margin-bottom: 0;">
-      <div class="motus-bot-header">
-        <strong>Limite de score max</strong>
-        <label class="motus-bot-toggle">
-          <input type="checkbox" id="bot-enable-max" ${config.enableMaxScore ? "checked" : ""}>
-          <span class="motus-bot-slider"></span>
-        </label>
+      
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+      
+      <div class="motus-bot-row" style="margin-bottom: 0;">
+        <div class="motus-bot-header">
+          <strong>Limite de score max</strong>
+          <label class="motus-bot-toggle">
+            <input type="checkbox" id="bot-enable-max" ${config.enableMaxScore ? "checked" : ""}>
+            <span class="motus-bot-slider"></span>
+          </label>
+        </div>
+        <div class="motus-bot-desc">Arrête le bot définitivement si votre propre score atteint ce palier.</div>
+        <input type="number" id="bot-max-score" class="motus-bot-input" value="${config.maxScoreValue}" placeholder="Score maximum">
       </div>
-      <div class="motus-bot-desc">Arrête le bot définitivement si votre propre score atteint ce palier.</div>
-      <input type="number" id="bot-max-score" class="motus-bot-input" value="${config.maxScoreValue}" placeholder="Score maximum">
-    </div>
-    
-    <!-- Warning shown only on hover -->
-    <div class="motus-bot-hover-alert">
-      ⚠️ Le rechargement de la page est suspendu tant que votre souris est sur ce menu.
+      
+      <!-- Warning shown only on hover -->
+      <div class="motus-bot-hover-alert">
+        ⚠️ Le rechargement de la page est suspendu tant que votre souris est sur ce menu.
+      </div>
     </div>
   `;
 
   document.body.appendChild(container);
 
-  // Automatically applies UI state (disabling and opacity) based on checkboxes
+  const dragHandle = document.getElementById("motus-bot-drag-handle");
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  dragHandle.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    const rect = container.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+
+    let newLeft = e.clientX - dragOffsetX;
+    let newTop = e.clientY - dragOffsetY;
+
+    const maxLeft = window.innerWidth - container.offsetWidth;
+    const maxTop = window.innerHeight - container.offsetHeight;
+
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    newTop = Math.max(0, Math.min(newTop, maxTop));
+
+    container.style.left = `${newLeft}px`;
+    container.style.top = `${newTop}px`;
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (isDragging) {
+      isDragging = false;
+
+      const currentConfig = loadConfig();
+      currentConfig.panelLeft = container.style.left;
+      currentConfig.panelTop = container.style.top;
+      saveConfig(currentConfig);
+    }
+  });
+
   const applyUIState = () => {
-    const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
+    const isPlayerEnabled =
+      document.getElementById("bot-enable-player").checked;
     const nameInput = document.getElementById("bot-target-name");
     const marginInput = document.getElementById("bot-target-margin");
-    
+
     nameInput.disabled = !isPlayerEnabled;
     marginInput.disabled = !isPlayerEnabled;
     nameInput.style.opacity = isPlayerEnabled ? "1" : "0.5";
@@ -184,31 +244,38 @@ function injectSettingsUI() {
 
     const isMaxEnabled = document.getElementById("bot-enable-max").checked;
     const maxInput = document.getElementById("bot-max-score");
-    
+
     maxInput.disabled = !isMaxEnabled;
     maxInput.style.opacity = isMaxEnabled ? "1" : "0.5";
   };
 
-  // Run once on load to set initial visual state
   applyUIState();
 
-  // Save changes automatically whenever any input is modified
-  container.addEventListener("input", () => {
+  container.addEventListener("input", (e) => {
+    if (e.target.id === "motus-bot-drag-handle") return;
+
+    const currentConfig = loadConfig();
     const newConfig = {
+      ...currentConfig,
       isPaused: document.getElementById("bot-pause").checked,
       enableTargetPlayer: document.getElementById("bot-enable-player").checked,
       targetPlayerName: document.getElementById("bot-target-name").value.trim(),
-      targetScoreMargin: parseInt(document.getElementById("bot-target-margin").value, 10) || 0,
+      targetScoreMargin:
+        parseInt(document.getElementById("bot-target-margin").value, 10) || 0,
       enableMaxScore: document.getElementById("bot-enable-max").checked,
-      maxScoreValue: parseInt(document.getElementById("bot-max-score").value, 10) || 0
+      maxScoreValue:
+        parseInt(document.getElementById("bot-max-score").value, 10) || 0,
     };
     saveConfig(newConfig);
     applyUIState();
   });
 
-  // Block page reload while user is interacting with settings
-  const blockReload = () => { window.isEditingBotConfig = true; };
-  const allowReload = () => { window.isEditingBotConfig = false; };
+  const blockReload = () => {
+    window.isEditingBotConfig = true;
+  };
+  const allowReload = () => {
+    window.isEditingBotConfig = false;
+  };
 
   container.addEventListener("mouseenter", blockReload);
   container.addEventListener("mouseleave", allowReload);
@@ -220,11 +287,11 @@ async function triggerSafeReload() {
   if (window.isEditingBotConfig) {
     updateBotStatus("Attente de la fermeture du menu...", "#fd7e14");
   }
-  
+
   while (window.isEditingBotConfig) {
     await new Promise((r) => setTimeout(r, 1000));
   }
-  
+
   updateBotStatus("Rechargement de la page...", "#0d6efd");
   location.reload();
 }
@@ -589,9 +656,15 @@ async function startGame() {
 
     if (config.enableTargetPlayer) {
       const targetScore = getPlayerScore(config.targetPlayerName);
-      if (targetScore !== null && currentScore >= targetScore + config.targetScoreMargin) {
-        updateBotStatus(`🎯 Cible dépassée (${config.targetPlayerName})`, "#6f42c1");
-        return; 
+      if (
+        targetScore !== null &&
+        currentScore >= targetScore + config.targetScoreMargin
+      ) {
+        updateBotStatus(
+          `🎯 Cible dépassée (${config.targetPlayerName})`,
+          "#6f42c1",
+        );
+        return;
       }
     }
 
@@ -608,9 +681,11 @@ async function startGame() {
 
     updateBotStatus("Recherche du meilleur mot...", "#0d6efd");
     let word = findNextCandidate(wordPool, gameState, validAnswers);
-    
+
     if (!word) {
-      console.warn("Aucun mot valide trouvé ! Réessai avec des mots déjà validés.");
+      console.warn(
+        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés.",
+      );
       if (validAnswers.length > 0) {
         word = validAnswers[0];
       } else {
@@ -618,7 +693,7 @@ async function startGame() {
         break;
       }
     }
-    
+
     updateBotStatus(`Saisie du mot : ${word.toUpperCase()}`, "#fd7e14");
     await typeWord(word);
 
@@ -634,7 +709,10 @@ async function startGame() {
     validAnswers.push(word);
 
     if (isGameWon()) {
-      updateBotStatus(`🎉 Mot trouvé ! (${attempt + 1}/${maxAttempts})`, "#198754");
+      updateBotStatus(
+        `🎉 Mot trouvé ! (${attempt + 1}/${maxAttempts})`,
+        "#198754",
+      );
       addValidWord(word);
       break;
     }
