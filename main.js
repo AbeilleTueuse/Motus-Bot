@@ -525,7 +525,7 @@ function findNextCandidate(wordList, gameState, validAnswers) {
 // ⌨️ KEYBOARD INTERACTION
 // ============================
 
-async function typeWord(word, delay = 50) {
+async function typeWord(word, delay = 100) {
   if (typeof word !== "string") throw new TypeError("Word must be a string.");
 
   const letters = word.toLowerCase().split("");
