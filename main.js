@@ -25,7 +25,7 @@ const DEFAULT_CONFIG = {
   maxScoreValue: 450000,
   panelTop: "10px",
   panelLeft: "10px",
-  initialDelay: 5, // Default delay of 5 seconds
+  initialDelay: 5,
 };
 
 function loadConfig() {
@@ -647,7 +647,6 @@ function getPlayerScore(playerName) {
 async function startGame() {
   injectSettingsUI();
   
-  // Handle initial countdown delay
   let delayLeft = loadConfig().initialDelay;
   while (delayLeft > 0) {
     while (loadConfig().isPaused) {
