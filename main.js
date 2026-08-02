@@ -25,6 +25,7 @@ const DEFAULT_CONFIG = {
   maxScoreValue: 450000,
   panelTop: "10px",
   panelLeft: "10px",
+  initialDelay: 5, // Default delay of 5 seconds
 };
 
 function loadConfig() {
@@ -149,6 +150,19 @@ function injectSettingsUI() {
       </div>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+      <div class="motus-bot-row">
+        <div class="motus-bot-header">
+          <strong>Délai initial</strong>
+        </div>
+        <div class="motus-bot-desc">Temps d'attente avant de jouer le premier mot (0 pour désactiver).</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="number" id="bot-initial-delay" class="motus-bot-input" value="${config.initialDelay}" min="0" style="width: 100px;">
+          <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">secondes</span>
+        </div>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
       
       <div class="motus-bot-row">
         <div class="motus-bot-header">
@@ -255,9 +269,15 @@ function injectSettingsUI() {
     if (e.target.id === "motus-bot-drag-handle") return;
 
     const currentConfig = loadConfig();
+    
+    // Validate the initial delay input
+    let parsedDelay = parseInt(document.getElementById("bot-initial-delay").value, 10);
+    if (isNaN(parsedDelay) || parsedDelay < 0) parsedDelay = 0;
+
     const newConfig = {
       ...currentConfig,
       isPaused: document.getElementById("bot-pause").checked,
+      initialDelay: parsedDelay,
       enableTargetPlayer: document.getElementById("bot-enable-player").checked,
       targetPlayerName: document.getElementById("bot-target-name").value.trim(),
       targetScoreMargin:
@@ -525,7 +545,7 @@ function findNextCandidate(wordList, gameState, validAnswers) {
 // ⌨️ KEYBOARD INTERACTION
 // ============================
 
-async function typeWord(word, delay = 100) {
+async function typeWord(word, delay = 50) {
   if (typeof word !== "string") throw new TypeError("Word must be a string.");
 
   const letters = word.toLowerCase().split("");
@@ -626,6 +646,19 @@ function getPlayerScore(playerName) {
 
 async function startGame() {
   injectSettingsUI();
+  
+  // Handle initial countdown delay
+  let delayLeft = loadConfig().initialDelay;
+  while (delayLeft > 0) {
+    while (loadConfig().isPaused) {
+      updateBotStatus("⏸️ Bot en pause", "#dc3545");
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    updateBotStatus(`Démarrage dans ${delayLeft} seconde(s)...`, "#fd7e14");
+    await new Promise((r) => setTimeout(r, 1000));
+    delayLeft--;
+  }
+
   updateBotStatus("Téléchargement du dictionnaire...", "#0d6efd");
 
   const allWords = await fetchFrenchWordList();
