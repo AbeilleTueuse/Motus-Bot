@@ -1,18 +1,21 @@
-// ============================
-// 🔧 CONSTANTS AND CONFIG
-// ============================
+// ============================================================================
+// 🔧 CONSTANTS AND SELECTORS (UPDATED FOR NEW HTML)
+// ============================================================================
 
-const GRID_CLASS = "motus-grille";
-const KEYBOARD_SELECTOR = "#keyboard .touche";
-const SPECIAL_KEYS = { enter: "13", backspace: "46" };
+const GRID_SELECTOR = "#mc-grille, .mc-grille";
+const ROW_SELECTOR = ".mc-ligne";
+const CELL_SELECTOR = ".mc-case";
+const KEYBOARD_CONTAINER_SELECTOR = "#mc-clavier";
+const KEY_BUTTON_SELECTOR = "#mc-clavier button[data-touche], .mc-touche";
+
 const INVALID_WORDS_KEY = "motus_invalid_words";
 const VALID_WORDS_KEY = "motus_valid_words";
 const WORD_SOURCE_URL =
   "https://raw.githubusercontent.com/lorenbrichter/Words/refs/heads/master/Words/fr.txt";
 
-// ============================
+// ============================================================================
 // ⚙️ BOT CONFIGURATION & UI
-// ============================
+// ============================================================================
 
 const CONFIG_KEY = "motus_bot_config";
 
@@ -50,6 +53,8 @@ function updateBotStatus(message, color = "#0d6efd") {
 }
 
 function injectSettingsUI() {
+  if (document.getElementById("motus-bot-container")) return;
+
   const config = loadConfig();
 
   const container = document.createElement("div");
@@ -108,7 +113,6 @@ function injectSettingsUI() {
       display: block;
     }
 
-    /* Styles for the draggable handle */
     .motus-bot-drag-handle {
       cursor: grab;
       background-color: #f1f3f5;
@@ -128,37 +132,36 @@ function injectSettingsUI() {
 
   container.innerHTML = `
     <div id="motus-bot-drag-handle" class="motus-bot-drag-handle">
-      <h3 style="margin: 0; font-size: 16px; color: #212529;">🤖 Configuration du Bot</h3>
+      <h3 style="margin: 0; font-size: 16px; color: #212529;">🤖 Bot Configuration</h3>
     </div>
     
     <div style="padding: 20px;">
-      <!-- Real-time Status Display -->
       <div class="motus-bot-status-box">
-        <strong style="color: #495057;">Statut :</strong><br>
-        <span id="bot-status-text" style="font-weight: bold; color: #0d6efd; font-size: 14px; display: inline-block; margin-top: 4px;">Initialisation...</span>
+        <strong style="color: #495057;">Status:</strong><br>
+        <span id="bot-status-text" style="font-weight: bold; color: #0d6efd; font-size: 14px; display: inline-block; margin-top: 4px;">Initializing...</span>
       </div>
       
       <div class="motus-bot-row">
         <div class="motus-bot-header">
-          <strong>Mettre en pause</strong>
+          <strong>Pause Bot</strong>
           <label class="motus-bot-toggle">
             <input type="checkbox" id="bot-pause" ${config.isPaused ? "checked" : ""}>
             <span class="motus-bot-slider"></span>
           </label>
         </div>
-        <div class="motus-bot-desc">Stoppe temporairement le bot. Prend effet immédiatement, même en plein milieu d'une partie.</div>
+        <div class="motus-bot-desc">Temporarily pauses bot execution.</div>
       </div>
       
       <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
       <div class="motus-bot-row">
         <div class="motus-bot-header">
-          <strong>Délai initial</strong>
+          <strong>Initial Delay</strong>
         </div>
-        <div class="motus-bot-desc">Temps d'attente avant de jouer le premier mot (0 pour désactiver).</div>
+        <div class="motus-bot-desc">Seconds to wait before typing the first word.</div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <input type="number" id="bot-initial-delay" class="motus-bot-input" value="${config.initialDelay}" min="0" style="width: 100px;">
-          <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">secondes</span>
+          <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">seconds</span>
         </div>
       </div>
 
@@ -166,18 +169,18 @@ function injectSettingsUI() {
       
       <div class="motus-bot-row">
         <div class="motus-bot-header">
-          <strong>Dépasser un joueur</strong>
+          <strong>Overtake Player</strong>
           <label class="motus-bot-toggle">
             <input type="checkbox" id="bot-enable-player" ${config.enableTargetPlayer ? "checked" : ""}>
             <span class="motus-bot-slider"></span>
           </label>
         </div>
-        <div class="motus-bot-desc">Arrête de jouer automatiquement une fois que le score de ce joueur est dépassé.</div>
+        <div class="motus-bot-desc">Stops automatically once targeted player score is overtaken.</div>
         <div style="display: flex; flex-direction: column; gap: 8px;">
-          <input type="text" id="bot-target-name" class="motus-bot-input" value="${config.targetPlayerName}" placeholder="Pseudo du joueur ciblé">
+          <input type="text" id="bot-target-name" class="motus-bot-input" value="${config.targetPlayerName}" placeholder="Target username">
           <div style="display: flex; align-items: center; gap: 8px;">
             <input type="number" id="bot-target-margin" class="motus-bot-input" value="${config.targetScoreMargin}" placeholder="10000" style="width: 100px;">
-            <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">points d'avance requis</span>
+            <span style="font-size: 11px; color: #6c757d; line-height: 1.1;">margin points</span>
           </div>
         </div>
       </div>
@@ -186,19 +189,18 @@ function injectSettingsUI() {
       
       <div class="motus-bot-row" style="margin-bottom: 0;">
         <div class="motus-bot-header">
-          <strong>Limite de score max</strong>
+          <strong>Max Score Cap</strong>
           <label class="motus-bot-toggle">
             <input type="checkbox" id="bot-enable-max" ${config.enableMaxScore ? "checked" : ""}>
             <span class="motus-bot-slider"></span>
           </label>
         </div>
-        <div class="motus-bot-desc">Arrête le bot définitivement si votre propre score atteint ce palier.</div>
-        <input type="number" id="bot-max-score" class="motus-bot-input" value="${config.maxScoreValue}" placeholder="Score maximum">
+        <div class="motus-bot-desc">Stops the bot once this score threshold is reached.</div>
+        <input type="number" id="bot-max-score" class="motus-bot-input" value="${config.maxScoreValue}" placeholder="Maximum score">
       </div>
       
-      <!-- Warning shown only on hover -->
       <div class="motus-bot-hover-alert">
-        ⚠️ Le rechargement de la page est suspendu tant que votre souris est sur ce menu.
+        ⚠️ Page reload is paused while your cursor is inside this menu.
       </div>
     </div>
   `;
@@ -236,7 +238,6 @@ function injectSettingsUI() {
   document.addEventListener("mouseup", () => {
     if (isDragging) {
       isDragging = false;
-
       const currentConfig = loadConfig();
       currentConfig.panelLeft = container.style.left;
       currentConfig.panelTop = container.style.top;
@@ -245,8 +246,7 @@ function injectSettingsUI() {
   });
 
   const applyUIState = () => {
-    const isPlayerEnabled =
-      document.getElementById("bot-enable-player").checked;
+    const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
     const nameInput = document.getElementById("bot-target-name");
     const marginInput = document.getElementById("bot-target-margin");
 
@@ -269,8 +269,6 @@ function injectSettingsUI() {
     if (e.target.id === "motus-bot-drag-handle") return;
 
     const currentConfig = loadConfig();
-    
-    // Validate the initial delay input
     let parsedDelay = parseInt(document.getElementById("bot-initial-delay").value, 10);
     if (isNaN(parsedDelay) || parsedDelay < 0) parsedDelay = 0;
 
@@ -290,12 +288,8 @@ function injectSettingsUI() {
     applyUIState();
   });
 
-  const blockReload = () => {
-    window.isEditingBotConfig = true;
-  };
-  const allowReload = () => {
-    window.isEditingBotConfig = false;
-  };
+  const blockReload = () => { window.isEditingBotConfig = true; };
+  const allowReload = () => { window.isEditingBotConfig = false; };
 
   container.addEventListener("mouseenter", blockReload);
   container.addEventListener("mouseleave", allowReload);
@@ -305,20 +299,20 @@ function injectSettingsUI() {
 
 async function triggerSafeReload() {
   if (window.isEditingBotConfig) {
-    updateBotStatus("Attente de la fermeture du menu...", "#fd7e14");
+    updateBotStatus("Waiting for menu to close before reloading...", "#fd7e14");
   }
 
   while (window.isEditingBotConfig) {
     await new Promise((r) => setTimeout(r, 1000));
   }
 
-  updateBotStatus("Rechargement de la page...", "#0d6efd");
+  updateBotStatus("Reloading page for next word...", "#0d6efd");
   location.reload();
 }
 
-// ============================
+// ============================================================================
 // 💾 LOCALSTORAGE MANAGEMENT
-// ============================
+// ============================================================================
 
 function loadInvalidWords() {
   try {
@@ -364,39 +358,39 @@ function addValidWord(word) {
   }
 }
 
-// ============================
-// 🎹 VIRTUAL KEYBOARD
-// ============================
+// ============================================================================
+// 🎹 VIRTUAL KEYBOARD INTEGRATION
+// ============================================================================
 
 function buildKeyboardMap() {
   const map = {};
+  const buttons = document.querySelectorAll(KEY_BUTTON_SELECTOR);
 
-  document.querySelectorAll(KEYBOARD_SELECTOR).forEach((btn) => {
-    const label = btn.textContent.trim().toLowerCase();
-    if (/^[a-z]$/.test(label)) {
-      map[label] = btn;
+  buttons.forEach((btn) => {
+    const keyAttr = (btn.getAttribute("data-touche") || btn.textContent).trim().toUpperCase();
+
+    if (keyAttr === "VALIDER" || keyAttr === "ENTER") {
+      map["enter"] = btn;
+    } else if (keyAttr === "EFFACER" || keyAttr === "BACKSPACE" || keyAttr === "SUPPR") {
+      map["backspace"] = btn;
+    } else if (/^[A-Z]$/.test(keyAttr)) {
+      map[keyAttr.toLowerCase()] = btn;
     }
   });
-
-  for (const [name, id] of Object.entries(SPECIAL_KEYS)) {
-    const btn = document.getElementById(id);
-    if (btn) map[name] = btn;
-  }
 
   return Object.freeze(map);
 }
 
-const KEYBOARD_MAP = buildKeyboardMap();
-
-// ============================
-// 📚 FRENCH WORD LIST
-// ============================
+// ============================================================================
+// 📚 FRENCH WORD LIST DOWNLOADER & NORMALIZER
+// ============================================================================
 
 async function fetchFrenchWordList() {
   const response = await fetch(WORD_SOURCE_URL);
 
-  if (!response.ok)
-    throw new Error(`Erreur de téléchargement : ${response.status}`);
+  if (!response.ok) {
+    throw new Error(`Download failed with status: ${response.status}`);
+  }
 
   const text = await response.text();
   const validWords = loadValidWords();
@@ -417,24 +411,30 @@ async function fetchFrenchWordList() {
   return Array.from(new Set(allWords));
 }
 
-// ============================
-// 🧩 GRID UTILITIES
-// ============================
+// ============================================================================
+// 🧩 GRID & DOM UTILITIES
+// ============================================================================
 
 function getGrid() {
-  const grid = document.querySelector(`.${GRID_CLASS}`);
-  if (!grid) throw new Error(`Grid not found: ${GRID_CLASS}`);
+  const grid = document.querySelector(GRID_SELECTOR);
+  if (!grid) throw new Error(`Grid not found with selector: ${GRID_SELECTOR}`);
   return grid;
 }
 
 function getNumberOfLetters() {
-  const firstRow = getGrid().firstElementChild;
-  if (!firstRow) throw new Error("First row is missing.");
-  return firstRow.children.length;
+  const grid = getGrid();
+  const firstRow = grid.querySelector(ROW_SELECTOR) || grid.firstElementChild;
+  if (firstRow && firstRow.children.length > 0) {
+    return firstRow.children.length;
+  }
+  const cols = parseInt(grid.style.getPropertyValue("--mc-cols"), 10);
+  return isNaN(cols) ? 9 : cols;
 }
 
 function getMaxAttempts() {
-  return getGrid().children.length;
+  const grid = getGrid();
+  const rows = grid.querySelectorAll(ROW_SELECTOR);
+  return rows.length > 0 ? rows.length : grid.children.length;
 }
 
 function getRowData(row) {
@@ -442,22 +442,41 @@ function getRowData(row) {
 
   return Array.from(row.children).map((cell) => {
     const letter = cell.textContent.trim().toLowerCase();
-    const classList = cell.firstElementChild.classList;
+    const classListStr = `${cell.className} ${cell.firstElementChild?.className || ""}`.toLowerCase();
 
     let status = "absent";
-    if (classList.contains("green")) status = "wellPlaced";
-    else if (classList.contains("orange")) status = "misplaced";
+    if (
+      classListStr.includes("bien-place") ||
+      classListStr.includes("correct") ||
+      classListStr.includes("green") ||
+      classListStr.includes("vert") ||
+      classListStr.includes("bg-success")
+    ) {
+      status = "wellPlaced";
+    } else if (
+      classListStr.includes("mal-place") ||
+      classListStr.includes("misplaced") ||
+      classListStr.includes("present") ||
+      classListStr.includes("orange") ||
+      classListStr.includes("jaune") ||
+      classListStr.includes("yellow") ||
+      classListStr.includes("cercle") ||
+      classListStr.includes("bg-warning")
+    ) {
+      status = "misplaced";
+    }
 
     return { letter, status };
   });
 }
 
-// ============================
-// 🧠 GAME LOGIC
-// ============================
+// ============================================================================
+// 🧠 SOLVER LOGIC
+// ============================================================================
 
 function initializeGameStateFromGrid() {
-  const firstRow = getGrid().firstElementChild;
+  const grid = getGrid();
+  const firstRow = grid.querySelector(ROW_SELECTOR) || grid.firstElementChild;
   if (!firstRow) throw new Error("First row not found.");
 
   const gameState = {
@@ -469,7 +488,9 @@ function initializeGameStateFromGrid() {
 
   Array.from(firstRow.children).forEach((cell, i) => {
     const letter = cell.textContent.trim().toLowerCase();
-    if (letter && letter !== ".") gameState.wellPlaced[i] = letter;
+    if (letter && /^[a-z]$/.test(letter)) {
+      gameState.wellPlaced[i] = letter;
+    }
   });
 
   return gameState;
@@ -493,14 +514,14 @@ function updateGameState(gameState, rowData) {
       case "misplaced":
         gameState.misplaced.add(letter);
         gameState.absent.delete(letter);
-        gameState.excludedPositions[letter] ||= [];
+        gameState.excludedPositions[letter] = gameState.excludedPositions[letter] || [];
         gameState.excludedPositions[letter].push(i);
         break;
       case "absent":
         if (!counts[letter]) {
           gameState.absent.add(letter);
         } else {
-          gameState.maxOccurrences ||= {};
+          gameState.maxOccurrences = gameState.maxOccurrences || {};
           gameState.maxOccurrences[letter] = counts[letter];
         }
         break;
@@ -541,98 +562,58 @@ function findNextCandidate(wordList, gameState, validAnswers) {
   );
 }
 
-// ============================
-// ⌨️ KEYBOARD INTERACTION
-// ============================
+// ============================================================================
+// ⌨️ TYPING ENGINE
+// ============================================================================
 
-async function typeWord(word, delay = 50) {
+async function typeWord(word, keyboardMap, delay = 60) {
   if (typeof word !== "string") throw new TypeError("Word must be a string.");
 
   const letters = word.toLowerCase().split("");
-  const expectedLength = getNumberOfLetters();
-
-  if (letters.length !== expectedLength) {
-    console.warn(`⚠️ "${word}" ne fait pas ${expectedLength} lettres.`);
-  }
 
   for (const letter of letters) {
-    const key = KEYBOARD_MAP[letter];
+    const key = keyboardMap[letter];
     if (key) key.click();
-    else console.warn(`⚠️ Lettre inconnue : "${letter}"`);
     await new Promise((r) => setTimeout(r, delay));
   }
 
-  KEYBOARD_MAP.enter?.click();
-  await new Promise((r) => setTimeout(r, 4000));
+  if (keyboardMap["enter"]) {
+    keyboardMap["enter"].click();
+  }
+  // Wait for letter flip animations to finish
+  await new Promise((r) => setTimeout(r, 2500));
 }
 
-// ============================
-// ✅ VALIDATION & ENDGAME
-// ============================
-
-async function waitForWordValidation(timeoutMs = 500) {
-  return new Promise((resolve) => {
-    const alertBox = document.getElementById("alert");
-    if (!alertBox) return resolve(true);
-
-    const start = performance.now();
-    (function check() {
-      const invalid = alertBox.children.length > 0;
-      const elapsed = performance.now() - start;
-      if (invalid) return resolve(false);
-      if (elapsed > timeoutMs) return resolve(true);
-      requestAnimationFrame(check);
-    })();
-  });
-}
-
-function isGameWon() {
-  const keyboard = document.getElementById("keyboard");
-  return (
-    keyboard?.firstElementChild?.classList.contains("alert-success") ?? false
-  );
-}
-
-function isGameLost() {
-  const keyboard = document.getElementById("keyboard");
-  return (
-    keyboard?.firstElementChild?.classList.contains("alert-danger") ?? false
-  );
-}
-
-function getSolutionWord() {
-  const keyboard = document.getElementById("keyboard");
-  return keyboard?.getElementsByTagName("STRONG")[0].textContent ?? null;
-}
+// ============================================================================
+// 📊 SCORE & LEADERBOARD PARSER
+// ============================================================================
 
 function getTotalScore() {
-  const scoreElem = document.getElementsByClassName("score_total")[0];
-
-  if (!scoreElem) {
-    console.warn("Élément de score non trouvé.");
-    return 0;
+  const scoreElem = document.querySelector("#mc-score-total, .score_total, .mc-total-score");
+  if (scoreElem) {
+    return parseInt(scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""), 10) || 0;
   }
-  return parseInt(scoreElem.textContent.replace(/\s+/g, ""), 10);
+  return 0;
 }
 
 function getPlayerScore(playerName) {
-  const nameContainers = document.querySelectorAll(".flex-grow-1.text-start");
+  const scoreCards = document.querySelectorAll("#mc-classement-jour .mc-score, .mc-classement-liste li");
 
-  for (let i = 0; i < nameContainers.length; i++) {
-    const container = nameContainers[i];
-    const currentPlayer = container.childNodes[0].textContent.trim();
+  for (const card of scoreCards) {
+    const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
+    if (!nameEl) continue;
 
-    if (currentPlayer.toLowerCase() === playerName.toLowerCase()) {
-      const scoreContainer = container.nextElementSibling;
+    const nameText = Array.from(nameEl.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent.trim())
+      .join(" ")
+      .trim();
 
-      if (scoreContainer && scoreContainer.classList.contains("text-end")) {
-        const scoreElement = scoreContainer.firstElementChild;
-
-        if (scoreElement) {
-          let rawScoreText = scoreElement.textContent;
-          let cleanScore = rawScoreText.replace(/pts/gi, "").replace(/\s/g, "");
-          return parseInt(cleanScore, 10);
-        }
+    if (nameText.toLowerCase() === playerName.toLowerCase().trim()) {
+      const badge = card.querySelector(".badge, .mc-points");
+      if (badge) {
+        const cleanScore = badge.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, "");
+        return parseInt(cleanScore, 10);
       }
     }
   }
@@ -640,25 +621,25 @@ function getPlayerScore(playerName) {
   return null;
 }
 
-// ============================
-// 🚀 MAIN GAME LOOP
-// ============================
+// ============================================================================
+// 🚀 MAIN BOT LOOP
+// ============================================================================
 
 async function startGame() {
   injectSettingsUI();
-  
+
   let delayLeft = loadConfig().initialDelay;
   while (delayLeft > 0) {
     while (loadConfig().isPaused) {
-      updateBotStatus("⏸️ Bot en pause", "#dc3545");
+      updateBotStatus("⏸️ Bot paused", "#dc3545");
       await new Promise((r) => setTimeout(r, 1000));
     }
-    updateBotStatus(`Démarrage dans ${delayLeft} seconde(s)...`, "#fd7e14");
+    updateBotStatus(`Starting in ${delayLeft}s...`, "#fd7e14");
     await new Promise((r) => setTimeout(r, 1000));
     delayLeft--;
   }
 
-  updateBotStatus("Téléchargement du dictionnaire...", "#0d6efd");
+  updateBotStatus("Downloading French dictionary...", "#0d6efd");
 
   const allWords = await fetchFrenchWordList();
   const invalidWords = loadInvalidWords();
@@ -671,91 +652,82 @@ async function startGame() {
     .filter((w) => !invalidWords.includes(w));
 
   const gameState = initializeGameStateFromGrid();
+  const keyboardMap = buildKeyboardMap();
   let attempt = 0;
+  let won = false;
 
   while (attempt < maxAttempts) {
-    let wasPaused = false;
-
     while (loadConfig().isPaused) {
-      updateBotStatus("⏸️ Bot en pause", "#dc3545");
-      wasPaused = true;
+      updateBotStatus("⏸️ Bot paused", "#dc3545");
       await new Promise((r) => setTimeout(r, 1000));
     }
-    if (wasPaused) updateBotStatus("Reprise de la partie...", "#198754");
 
     const config = loadConfig();
     const currentScore = getTotalScore();
 
     if (config.enableTargetPlayer) {
       const targetScore = getPlayerScore(config.targetPlayerName);
-      if (
-        targetScore !== null &&
-        currentScore >= targetScore + config.targetScoreMargin
-      ) {
-        updateBotStatus(
-          `🎯 Cible dépassée (${config.targetPlayerName})`,
-          "#6f42c1",
-        );
+      if (targetScore !== null && currentScore >= targetScore + config.targetScoreMargin) {
+        updateBotStatus(`🎯 Target overtaken (${config.targetPlayerName})`, "#6f42c1");
         return;
       }
     }
 
     if (config.enableMaxScore && currentScore >= config.maxScoreValue) {
-      updateBotStatus(`🏆 Score limite atteint`, "#6f42c1");
+      updateBotStatus(`🏆 Max score limit reached`, "#6f42c1");
       return;
     }
 
     if (attempt > 0) {
-      const prevRow = getGrid().children[attempt - 1];
+      const grid = getGrid();
+      const rows = grid.querySelectorAll(ROW_SELECTOR);
+      const prevRow = rows[attempt - 1] || grid.children[attempt - 1];
       const data = getRowData(prevRow);
+
       updateGameState(gameState, data);
-    }
 
-    updateBotStatus("Recherche du meilleur mot...", "#0d6efd");
-    let word = findNextCandidate(wordPool, gameState, validAnswers);
-
-    if (!word) {
-      console.warn(
-        "Aucun mot valide trouvé ! Réessai avec des mots déjà validés.",
-      );
-      if (validAnswers.length > 0) {
-        word = validAnswers[0];
-      } else {
-        updateBotStatus("❌ Dictionnaire épuisé", "#dc3545");
+      if (data.length > 0 && data.every((cell) => cell.status === "wellPlaced")) {
+        won = true;
         break;
       }
     }
 
-    updateBotStatus(`Saisie du mot : ${word.toUpperCase()}`, "#fd7e14");
-    await typeWord(word);
+    updateBotStatus("Computing candidate word...", "#0d6efd");
+    let word = findNextCandidate(wordPool, gameState, validAnswers);
 
-    updateBotStatus("Vérification du résultat...", "#0d6efd");
-    const valid = await waitForWordValidation();
-    if (!valid) {
-      console.warn(`❌ "${word}" invalide.`);
-      addInvalidWord(word);
-      wordPool.splice(wordPool.indexOf(word), 1);
-      continue;
+    if (!word) {
+      if (validAnswers.length > 0) {
+        word = validAnswers[0];
+      } else {
+        updateBotStatus("❌ Dictionary exhausted", "#dc3545");
+        break;
+      }
     }
+
+    updateBotStatus(`Submitting: ${word.toUpperCase()}`, "#fd7e14");
+    await typeWord(word, keyboardMap);
 
     validAnswers.push(word);
-
-    if (isGameWon()) {
-      updateBotStatus(
-        `🎉 Mot trouvé ! (${attempt + 1}/${maxAttempts})`,
-        "#198754",
-      );
-      addValidWord(word);
-      break;
-    }
-
     attempt++;
   }
 
-  if (isGameLost()) {
-    const solution = getSolutionWord();
-    updateBotStatus(`😞 Perdu. Solution : ${solution}`, "#dc3545");
-    if (solution) addValidWord(solution);
+  // Final check on the last row played
+  if (!won && attempt > 0) {
+    const grid = getGrid();
+    const rows = grid.querySelectorAll(ROW_SELECTOR);
+    const lastRow = rows[attempt - 1] || grid.children[attempt - 1];
+    const data = getRowData(lastRow);
+    if (data.length > 0 && data.every((cell) => cell.status === "wellPlaced")) {
+      won = true;
+    }
+  }
+
+  if (won) {
+    updateBotStatus(`🎉 Word found in attempt ${attempt}/${maxAttempts}!`, "#198754");
+    const lastWord = validAnswers[validAnswers.length - 1];
+    if (lastWord) addValidWord(lastWord);
+  } else {
+    updateBotStatus(`😞 Word missed.`, "#dc3545");
   }
 
   await triggerSafeReload();
