@@ -451,7 +451,7 @@ function getMaxAttempts() {
   return rows.length > 0 ? rows.length : grid.children.length;
 }
 
-function waitForRowReveal(row, timeout = 3500, postDelay = 1000) {
+function waitForRowReveal(row, timeout = 5000, postDelay = 1000) {
   return new Promise((resolve) => {
     if (!row) return resolve(false);
 
