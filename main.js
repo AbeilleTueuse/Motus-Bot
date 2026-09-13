@@ -246,7 +246,8 @@ function injectSettingsUI() {
   });
 
   const applyUIState = () => {
-    const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
+    const isPlayerEnabled =
+      document.getElementById("bot-enable-player").checked;
     const nameInput = document.getElementById("bot-target-name");
     const marginInput = document.getElementById("bot-target-margin");
 
@@ -269,7 +270,10 @@ function injectSettingsUI() {
     if (e.target.id === "motus-bot-drag-handle") return;
 
     const currentConfig = loadConfig();
-    let parsedDelay = parseInt(document.getElementById("bot-initial-delay").value, 10);
+    let parsedDelay = parseInt(
+      document.getElementById("bot-initial-delay").value,
+      10,
+    );
     if (isNaN(parsedDelay) || parsedDelay < 0) parsedDelay = 0;
 
     const newConfig = {
@@ -288,8 +292,12 @@ function injectSettingsUI() {
     applyUIState();
   });
 
-  const blockReload = () => { window.isEditingBotConfig = true; };
-  const allowReload = () => { window.isEditingBotConfig = false; };
+  const blockReload = () => {
+    window.isEditingBotConfig = true;
+  };
+  const allowReload = () => {
+    window.isEditingBotConfig = false;
+  };
 
   container.addEventListener("mouseenter", blockReload);
   container.addEventListener("mouseleave", allowReload);
@@ -367,11 +375,17 @@ function buildKeyboardMap() {
   const buttons = document.querySelectorAll(KEY_BUTTON_SELECTOR);
 
   buttons.forEach((btn) => {
-    const keyAttr = (btn.getAttribute("data-touche") || btn.textContent).trim().toUpperCase();
+    const keyAttr = (btn.getAttribute("data-touche") || btn.textContent)
+      .trim()
+      .toUpperCase();
 
     if (keyAttr === "VALIDER" || keyAttr === "ENTER") {
       map["enter"] = btn;
-    } else if (keyAttr === "EFFACER" || keyAttr === "BACKSPACE" || keyAttr === "SUPPR") {
+    } else if (
+      keyAttr === "EFFACER" ||
+      keyAttr === "BACKSPACE" ||
+      keyAttr === "SUPPR"
+    ) {
       map["backspace"] = btn;
     } else if (/^[A-Z]$/.test(keyAttr)) {
       map[keyAttr.toLowerCase()] = btn;
@@ -437,32 +451,53 @@ function getMaxAttempts() {
   return rows.length > 0 ? rows.length : grid.children.length;
 }
 
+function waitForRowReveal(row, timeout = 3500, postDelay = 1000) {
+  return new Promise((resolve) => {
+    if (!row) return resolve(false);
+
+    const cells = row.querySelectorAll(CELL_SELECTOR);
+    const lastCell = cells[cells.length - 1];
+
+    const done = (success) => {
+      setTimeout(() => resolve(success), success ? postDelay : 0);
+    };
+
+    if (!lastCell || lastCell.classList.contains("mc-revele")) {
+      return done(true);
+    }
+
+    let timer;
+    const observer = new MutationObserver(() => {
+      if (lastCell.classList.contains("mc-revele")) {
+        clearTimeout(timer);
+        observer.disconnect();
+        done(true);
+      }
+    });
+
+    observer.observe(lastCell, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    timer = setTimeout(() => {
+      observer.disconnect();
+      done(false);
+    }, timeout);
+  });
+}
+
 function getRowData(row) {
   if (!row) throw new Error("Row element not found.");
 
   return Array.from(row.children).map((cell) => {
     const letter = cell.textContent.trim().toLowerCase();
-    const classListStr = `${cell.className} ${cell.firstElementChild?.className || ""}`.toLowerCase();
+    const classList = cell.classList;
 
     let status = "absent";
-    if (
-      classListStr.includes("bien-place") ||
-      classListStr.includes("correct") ||
-      classListStr.includes("green") ||
-      classListStr.includes("vert") ||
-      classListStr.includes("bg-success")
-    ) {
+    if (classList.contains("bg-success")) {
       status = "wellPlaced";
-    } else if (
-      classListStr.includes("mal-place") ||
-      classListStr.includes("misplaced") ||
-      classListStr.includes("present") ||
-      classListStr.includes("orange") ||
-      classListStr.includes("jaune") ||
-      classListStr.includes("yellow") ||
-      classListStr.includes("cercle") ||
-      classListStr.includes("bg-warning")
-    ) {
+    } else if (classList.contains("bg-warning")) {
       status = "misplaced";
     }
 
@@ -514,7 +549,8 @@ function updateGameState(gameState, rowData) {
       case "misplaced":
         gameState.misplaced.add(letter);
         gameState.absent.delete(letter);
-        gameState.excludedPositions[letter] = gameState.excludedPositions[letter] || [];
+        gameState.excludedPositions[letter] =
+          gameState.excludedPositions[letter] || [];
         gameState.excludedPositions[letter].push(i);
         break;
       case "absent":
@@ -566,7 +602,7 @@ function findNextCandidate(wordList, gameState, validAnswers) {
 // ⌨️ TYPING ENGINE
 // ============================================================================
 
-async function typeWord(word, keyboardMap, delay = 60) {
+async function typeWord(word, keyboardMap, currentRow, delay = 60) {
   if (typeof word !== "string") throw new TypeError("Word must be a string.");
 
   const letters = word.toLowerCase().split("");
@@ -580,8 +616,12 @@ async function typeWord(word, keyboardMap, delay = 60) {
   if (keyboardMap["enter"]) {
     keyboardMap["enter"].click();
   }
-  // Wait for letter flip animations to finish
-  await new Promise((r) => setTimeout(r, 2500));
+
+  if (currentRow) {
+    await waitForRowReveal(currentRow);
+  } else {
+    await new Promise((r) => setTimeout(r, 1200));
+  }
 }
 
 // ============================================================================
@@ -589,15 +629,24 @@ async function typeWord(word, keyboardMap, delay = 60) {
 // ============================================================================
 
 function getTotalScore() {
-  const scoreElem = document.querySelector("#mc-score-total, .score_total, .mc-total-score");
+  const scoreElem = document.querySelector(
+    "#mc-score-total, .score_total, .mc-total-score",
+  );
   if (scoreElem) {
-    return parseInt(scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""), 10) || 0;
+    return (
+      parseInt(
+        scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""),
+        10,
+      ) || 0
+    );
   }
   return 0;
 }
 
 function getPlayerScore(playerName) {
-  const scoreCards = document.querySelectorAll("#mc-classement-jour .mc-score, .mc-classement-liste li");
+  const scoreCards = document.querySelectorAll(
+    "#mc-classement-jour .mc-score, .mc-classement-liste li",
+  );
 
   for (const card of scoreCards) {
     const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
@@ -612,7 +661,9 @@ function getPlayerScore(playerName) {
     if (nameText.toLowerCase() === playerName.toLowerCase().trim()) {
       const badge = card.querySelector(".badge, .mc-points");
       if (badge) {
-        const cleanScore = badge.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, "");
+        const cleanScore = badge.textContent
+          .replace(/pts/gi, "")
+          .replace(/[\s\u00a0]/g, "");
         return parseInt(cleanScore, 10);
       }
     }
@@ -667,8 +718,14 @@ async function startGame() {
 
     if (config.enableTargetPlayer) {
       const targetScore = getPlayerScore(config.targetPlayerName);
-      if (targetScore !== null && currentScore >= targetScore + config.targetScoreMargin) {
-        updateBotStatus(`🎯 Target overtaken (${config.targetPlayerName})`, "#6f42c1");
+      if (
+        targetScore !== null &&
+        currentScore >= targetScore + config.targetScoreMargin
+      ) {
+        updateBotStatus(
+          `🎯 Target overtaken (${config.targetPlayerName})`,
+          "#6f42c1",
+        );
         return;
       }
     }
@@ -686,7 +743,10 @@ async function startGame() {
 
       updateGameState(gameState, data);
 
-      if (data.length > 0 && data.every((cell) => cell.status === "wellPlaced")) {
+      if (
+        data.length > 0 &&
+        data.every((cell) => cell.status === "wellPlaced")
+      ) {
         won = true;
         break;
       }
@@ -704,8 +764,12 @@ async function startGame() {
       }
     }
 
+    const grid = getGrid();
+    const rows = grid.querySelectorAll(ROW_SELECTOR);
+    const currentRow = rows[attempt] || grid.children[attempt];
+
     updateBotStatus(`Submitting: ${word.toUpperCase()}`, "#fd7e14");
-    await typeWord(word, keyboardMap);
+    await typeWord(word, keyboardMap, currentRow);
 
     validAnswers.push(word);
     attempt++;
@@ -723,7 +787,10 @@ async function startGame() {
   }
 
   if (won) {
-    updateBotStatus(`🎉 Word found in attempt ${attempt}/${maxAttempts}!`, "#198754");
+    updateBotStatus(
+      `🎉 Word found in attempt ${attempt}/${maxAttempts}!`,
+      "#198754",
+    );
     const lastWord = validAnswers[validAnswers.length - 1];
     if (lastWord) addValidWord(lastWord);
   } else {
