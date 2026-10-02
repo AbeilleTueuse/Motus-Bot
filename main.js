@@ -8,6 +8,7 @@ const CELL_SELECTOR = ".mc-case";
 const KEYBOARD_CONTAINER_SELECTOR = "#mc-clavier";
 const KEY_BUTTON_SELECTOR = "#mc-clavier button[data-touche], .mc-touche";
 const DIFFICULTY_BUTTON_SELECTOR = "#mc-difficile";
+const USERNAME_SELECTOR = ".d-none.d-sm-inline";
 
 const INVALID_WORDS_KEY = "motus_invalid_words";
 const VALID_WORDS_KEY = "motus_valid_words_by_mode";
@@ -329,7 +330,7 @@ function renderModalWords(query = "") {
 }
 
 // ============================================================================
-// 🖥️️ UI SETTINGS (FLOATING PANEL)
+// 🖥 UI SETTINGS (FLOATING PANEL)
 // ============================================================================
 
 function injectSettingsUI() {
@@ -816,19 +817,9 @@ async function typeWord(word, keyboardMap, currentRow, delay = 60) {
 // 📊 SCORE & LEADERBOARD PARSER
 // ============================================================================
 
-function getTotalScore() {
-  const scoreElem = document.querySelector(
-    "#mc-score-total, .score_total, .mc-total-score",
-  );
-  if (scoreElem) {
-    return (
-      parseInt(
-        scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""),
-        10,
-      ) || 0
-    );
-  }
-  return 0;
+function getMyPlayerName() {
+  const userElem = document.querySelector(USERNAME_SELECTOR);
+  return userElem ? userElem.textContent.trim() : "";
 }
 
 function getPlayerScore(playerName) {
@@ -860,7 +851,27 @@ function getPlayerScore(playerName) {
       }
     }
   }
-  // Returns 0 points if player is not found on the leaderboard
+  // Default to 0 points if player is not found on the leaderboard
+  return 0;
+}
+
+function getTotalScore() {
+  const myName = getMyPlayerName();
+  if (myName) {
+    return getPlayerScore(myName);
+  }
+
+  const scoreElem = document.querySelector(
+    "#mc-score-total, .score_total, .mc-total-score",
+  );
+  if (scoreElem) {
+    return (
+      parseInt(
+        scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""),
+        10,
+      ) || 0
+    );
+  }
   return 0;
 }
 
