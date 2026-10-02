@@ -63,7 +63,7 @@ function getCurrentGameMode() {
 }
 
 // ============================================================================
-// 💾 STORAGE (MOTS VALIDES PAR MODE ET LONGUEUR)
+// 💾 STORAGE (VALID WORDS BY MODE AND LENGTH)
 // ============================================================================
 
 function loadValidWordsStore() {
@@ -116,7 +116,7 @@ function loadInvalidWords() {
 }
 
 // ============================================================================
-// 🪟 MODAL DU DICTIONNAIRE
+// 🪟 DICTIONARY MODAL
 // ============================================================================
 
 let currentModalTab = "normal";
@@ -140,13 +140,13 @@ function injectDictionaryModal() {
   overlay.innerHTML = `
     <div style="background: #ffffff; width: 680px; max-width: 90vw; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
       
-      <!-- En-tête -->
+      <!-- Header -->
       <div style="padding: 16px 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
         <h3 style="margin: 0; font-size: 18px; color: #212529;">📖 Mots découverts</h3>
         <button id="motus-modal-close-btn" type="button" style="background: transparent; border: none; font-size: 20px; cursor: pointer; color: #6c757d; line-height: 1;">&times;</button>
       </div>
 
-      <!-- Contrôles (Onglets + Recherche) -->
+      <!-- Controls -->
       <div style="padding: 12px 20px; border-bottom: 1px solid #eee; display: flex; gap: 12px; align-items: center; background: #fff;">
         <div style="display: flex; gap: 6px;">
           <button type="button" id="modal-tab-normal" class="motus-tab-btn active" style="padding: 6px 14px; border-radius: 6px;">Normal</button>
@@ -155,10 +155,10 @@ function injectDictionaryModal() {
         <input type="text" id="modal-search-input" placeholder="Filtrer un mot..." style="flex: 1; padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px;">
       </div>
 
-      <!-- Contenu défilant -->
+      <!-- Scrollable content -->
       <div id="modal-dict-body" style="padding: 20px; overflow-y: auto; flex: 1; font-size: 13px; background: #fafafa;"></div>
 
-      <!-- Pied de page -->
+      <!-- Footer -->
       <div style="padding: 12px 20px; background: #f8f9fa; border-top: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
         <span id="modal-total-count" style="font-weight: 600; color: #495057;">0 mot enregistré</span>
         <div style="display: flex; gap: 8px;">
@@ -266,7 +266,6 @@ function renderModalWords(query = "") {
     if (matched.length > 0) {
       const isNineLetters = Number(len) === 9;
 
-      // Groupement : 1re & 3e lettre pour 9 lettres, sinon 1re lettre
       const groups = {};
       matched.forEach((w) => {
         let key = "";
@@ -286,7 +285,6 @@ function renderModalWords(query = "") {
       sortedKeys.forEach((key) => {
         const groupWords = groups[key].sort((a, b) => a.localeCompare(b));
 
-        // Déroulant par lettre / indice (déplié automatiquement si recherche active)
         groupsHtml += `
           <details ${hasFilter ? "open" : ""} style="margin-top: 6px; border: 1px solid #e2e8f0; border-radius: 6px; background: #ffffff; overflow: hidden;">
             <summary style="cursor: pointer; padding: 7px 10px; background: #f8f9fa; font-size: 12px; font-weight: 600; color: #495057; display: flex; justify-content: space-between; align-items: center; user-select: none;">
@@ -300,7 +298,6 @@ function renderModalWords(query = "") {
         `;
       });
 
-      // Déroulant principal par longueur de mot
       html += `
         <details ${hasFilter ? "open" : ""} style="margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 8px; background: #ffffff; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
           <summary style="cursor: pointer; padding: 10px 14px; background: #ffffff; font-size: 13px; font-weight: bold; color: #0d6efd; display: flex; justify-content: space-between; align-items: center; user-select: none;">
@@ -330,8 +327,9 @@ function renderModalWords(query = "") {
 
   container.innerHTML = html;
 }
+
 // ============================================================================
-// 🖥️ UI SETTINGS (PANNEAU FLOTTANT)
+// 🖥️️ UI SETTINGS (FLOATING PANEL)
 // ============================================================================
 
 function injectSettingsUI() {
@@ -448,7 +446,6 @@ function injectSettingsUI() {
 
       <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
 
-      <!-- BOUTON D'OUVERTURE DE LA MODALE -->
       <button type="button" id="bot-open-modal-btn" style="width: 100%; padding: 8px; font-size: 12px; font-weight: bold; border: 1px solid #0d6efd; background: #e7f1ff; color: #0d6efd; border-radius: 6px; cursor: pointer;">
         📖 Ouvrir le dictionnaire
       </button>
@@ -461,7 +458,7 @@ function injectSettingsUI() {
 
   document.body.appendChild(container);
 
-  // Drag & drop
+  // Drag & drop handling
   const dragHandle = document.getElementById("motus-bot-drag-handle");
   let isDragging = false;
   let dragOffsetX = 0;
@@ -835,6 +832,7 @@ function getTotalScore() {
 }
 
 function getPlayerScore(playerName) {
+  if (!playerName) return 0;
   const scoreCards = document.querySelectorAll(
     "#mc-classement-jour .mc-score, .mc-classement-liste li",
   );
@@ -842,11 +840,15 @@ function getPlayerScore(playerName) {
     const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
     if (!nameEl) continue;
 
-    const nameText = Array.from(nameEl.childNodes)
+    let nameText = Array.from(nameEl.childNodes)
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .map((node) => node.textContent.trim())
       .join(" ")
       .trim();
+
+    if (!nameText) {
+      nameText = nameEl.textContent.trim();
+    }
 
     if (nameText.toLowerCase() === playerName.toLowerCase().trim()) {
       const badge = card.querySelector(".badge, .mc-points");
@@ -854,11 +856,35 @@ function getPlayerScore(playerName) {
         const cleanScore = badge.textContent
           .replace(/pts/gi, "")
           .replace(/[\s\u00a0]/g, "");
-        return parseInt(cleanScore, 10);
+        return parseInt(cleanScore, 10) || 0;
       }
     }
   }
-  return null;
+  // Returns 0 points if player is not found on the leaderboard
+  return 0;
+}
+
+function checkTargetReached() {
+  const config = loadConfig();
+  const currentScore = getTotalScore();
+
+  if (config.enableTargetPlayer) {
+    const targetScore = getPlayerScore(config.targetPlayerName) ?? 0;
+    if (currentScore >= targetScore + config.targetScoreMargin) {
+      updateBotStatus(
+        `🎯 Cible dépassée (${config.targetPlayerName})`,
+        "#6f42c1",
+      );
+      return true;
+    }
+  }
+
+  if (config.enableMaxScore && currentScore >= config.maxScoreValue) {
+    updateBotStatus(`🏆 Plafond de score atteint`, "#6f42c1");
+    return true;
+  }
+
+  return false;
 }
 
 // ============================================================================
@@ -869,16 +895,22 @@ async function startGame() {
   injectSettingsUI();
   injectDictionaryModal();
 
+  // Immediate limit check before starting countdown
+  if (checkTargetReached()) return;
+
   let delayLeft = loadConfig().initialDelay;
   while (delayLeft > 0) {
     while (loadConfig().isPaused) {
       updateBotStatus("⏸️ En pause", "#dc3545");
       await new Promise((r) => setTimeout(r, 1000));
     }
+    if (checkTargetReached()) return;
     updateBotStatus(`Démarrage dans ${delayLeft}s...`, "#fd7e14");
     await new Promise((r) => setTimeout(r, 1000));
     delayLeft--;
   }
+
+  if (checkTargetReached()) return;
 
   updateBotStatus("Chargement du dictionnaire...", "#0d6efd");
 
@@ -907,27 +939,7 @@ async function startGame() {
       await new Promise((r) => setTimeout(r, 1000));
     }
 
-    const config = loadConfig();
-    const currentScore = getTotalScore();
-
-    if (config.enableTargetPlayer) {
-      const targetScore = getPlayerScore(config.targetPlayerName);
-      if (
-        targetScore !== null &&
-        currentScore >= targetScore + config.targetScoreMargin
-      ) {
-        updateBotStatus(
-          `🎯 Cible dépassée (${config.targetPlayerName})`,
-          "#6f42c1",
-        );
-        return;
-      }
-    }
-
-    if (config.enableMaxScore && currentScore >= config.maxScoreValue) {
-      updateBotStatus(`🏆 Plafond de score atteint`, "#6f42c1");
-      return;
-    }
+    if (checkTargetReached()) return;
 
     if (attempt > 0) {
       const grid = getGrid();
