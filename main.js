@@ -817,13 +817,20 @@ async function typeWord(word, keyboardMap, currentRow, delay = 60) {
 // 📊 SCORE & LEADERBOARD PARSER
 // ============================================================================
 
+function cleanPlayerString(str) {
+  if (!str) return "";
+  return str.replace(/\s*\(\s*vous\s*\)/gi, "").trim().toLowerCase();
+}
+
 function getMyPlayerName() {
   const userElem = document.querySelector(USERNAME_SELECTOR);
-  return userElem ? userElem.textContent.trim() : "";
+  return userElem ? cleanPlayerString(userElem.textContent) : "";
 }
 
 function getPlayerScore(playerName) {
   if (!playerName) return 0;
+  const targetName = cleanPlayerString(playerName);
+
   const scoreCards = document.querySelectorAll(
     "#mc-classement-jour .mc-score, .mc-classement-liste li",
   );
@@ -831,17 +838,19 @@ function getPlayerScore(playerName) {
     const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
     if (!nameEl) continue;
 
-    let nameText = Array.from(nameEl.childNodes)
+    let rawName = Array.from(nameEl.childNodes)
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .map((node) => node.textContent.trim())
       .join(" ")
       .trim();
 
-    if (!nameText) {
-      nameText = nameEl.textContent.trim();
+    if (!rawName) {
+      rawName = nameEl.textContent.trim();
     }
 
-    if (nameText.toLowerCase() === playerName.toLowerCase().trim()) {
+    const cleanCardName = cleanPlayerString(rawName);
+
+    if (cleanCardName === targetName) {
       const badge = card.querySelector(".badge, .mc-points");
       if (badge) {
         const cleanScore = badge.textContent
@@ -851,16 +860,39 @@ function getPlayerScore(playerName) {
       }
     }
   }
-  // Default to 0 points if player is not found on the leaderboard
   return 0;
 }
 
 function getTotalScore() {
-  const myName = getMyPlayerName();
-  if (myName) {
-    return getPlayerScore(myName);
+  const scoreCards = document.querySelectorAll(
+    "#mc-classement-jour .mc-score, .mc-classement-liste li",
+  );
+
+  // Method 1: Look directly for the row containing "(vous)" in the leaderboard
+  for (const card of scoreCards) {
+    const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
+    const rawText = (nameEl ? nameEl.textContent : card.textContent).toLowerCase();
+
+    if (rawText.includes("(vous)")) {
+      const badge = card.querySelector(".badge, .mc-points");
+      if (badge) {
+        const cleanScore = badge.textContent
+          .replace(/pts/gi, "")
+          .replace(/[\s\u00a0]/g, "");
+        const parsed = parseInt(cleanScore, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+    }
   }
 
+  // Method 2: Match by header username (stripping "(vous)")
+  const myName = getMyPlayerName();
+  if (myName) {
+    const score = getPlayerScore(myName);
+    if (score > 0) return score;
+  }
+
+  // Method 3: Legacy score selectors fallback
   const scoreElem = document.querySelector(
     "#mc-score-total, .score_total, .mc-total-score",
   );
@@ -872,6 +904,7 @@ function getTotalScore() {
       ) || 0
     );
   }
+
   return 0;
 }
 
@@ -906,7 +939,6 @@ async function startGame() {
   injectSettingsUI();
   injectDictionaryModal();
 
-  // Immediate limit check before starting countdown
   if (checkTargetReached()) return;
 
   let delayLeft = loadConfig().initialDelay;
