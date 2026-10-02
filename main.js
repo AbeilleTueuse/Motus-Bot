@@ -873,7 +873,7 @@ function getTotalScore() {
     const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
     const rawText = (nameEl ? nameEl.textContent : card.textContent).toLowerCase();
 
-    if (rawText.includes("(vous)")) {
+    if (rawText.includes("vous")) {
       const badge = card.querySelector(".badge, .mc-points");
       if (badge) {
         const cleanScore = badge.textContent
