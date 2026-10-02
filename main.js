@@ -822,11 +822,6 @@ function cleanPlayerString(str) {
   return str.replace(/\s*\(\s*vous\s*\)/gi, "").trim().toLowerCase();
 }
 
-function getMyPlayerName() {
-  const userElem = document.querySelector(USERNAME_SELECTOR);
-  return userElem ? cleanPlayerString(userElem.textContent) : "";
-}
-
 function getPlayerScore(playerName) {
   if (!playerName) return 0;
   const targetName = cleanPlayerString(playerName);
@@ -851,7 +846,7 @@ function getPlayerScore(playerName) {
     const cleanCardName = cleanPlayerString(rawName);
 
     if (cleanCardName === targetName) {
-      const badge = card.querySelector(".badge, .mc-points");
+      const badge = card.querySelector(".badge.rounded-pill");
       if (badge) {
         const cleanScore = badge.textContent
           .replace(/pts/gi, "")
@@ -863,49 +858,13 @@ function getPlayerScore(playerName) {
   return 0;
 }
 
+function getMyPlayerName() {
+  const userElem = document.querySelector(USERNAME_SELECTOR);
+  return userElem ? cleanPlayerString(userElem.textContent) : "";
+}
+
 function getTotalScore() {
-  const scoreCards = document.querySelectorAll(
-    "#mc-classement-jour .mc-score, .mc-classement-liste li",
-  );
-
-  // Method 1: Look directly for the row containing "(vous)" in the leaderboard
-  for (const card of scoreCards) {
-    const nameEl = card.querySelector(".text-truncate, .mc-joueur-nom");
-    const rawText = (nameEl ? nameEl.textContent : card.textContent).toLowerCase();
-
-    if (rawText.includes("vous")) {
-      const badge = card.querySelector(".badge, .mc-points");
-      if (badge) {
-        const cleanScore = badge.textContent
-          .replace(/pts/gi, "")
-          .replace(/[\s\u00a0]/g, "");
-        const parsed = parseInt(cleanScore, 10);
-        if (!isNaN(parsed)) return parsed;
-      }
-    }
-  }
-
-  // Method 2: Match by header username (stripping "(vous)")
-  const myName = getMyPlayerName();
-  if (myName) {
-    const score = getPlayerScore(myName);
-    if (score > 0) return score;
-  }
-
-  // Method 3: Legacy score selectors fallback
-  const scoreElem = document.querySelector(
-    "#mc-score-total, .score_total, .mc-total-score",
-  );
-  if (scoreElem) {
-    return (
-      parseInt(
-        scoreElem.textContent.replace(/pts/gi, "").replace(/[\s\u00a0]/g, ""),
-        10,
-      ) || 0
-    );
-  }
-
-  return 0;
+  return getPlayerScore(getMyPlayerName()) || 0;
 }
 
 function checkTargetReached() {
