@@ -11,7 +11,9 @@ const DIFFICULTY_BUTTON_SELECTOR = "#mc-difficile";
 const USERNAME_SELECTOR = ".d-none.d-sm-inline";
 
 const INVALID_WORDS_KEY = "motus_invalid_words";
-const VALID_WORDS_KEY = "motus_valid_words_by_mode";
+const MASTER_WORDS_KEY = "motus_valid_words_master";
+const LEGACY_WORDS_KEY = "motus_valid_words_by_mode";
+const ACTIVE_CYCLE_KEY = "motus_active_cycle_words";
 const WORD_SOURCE_URL =
   "https://raw.githubusercontent.com/lorenbrichter/Words/refs/heads/master/Words/fr.txt";
 
@@ -63,13 +65,32 @@ function getCurrentGameMode() {
     : "normal";
 }
 
+function cleanPlayerString(str) {
+  if (!str) return "";
+  return str.replace(/\s*\(\s*vous\s*\)/gi, "").trim().toLowerCase();
+}
+
+function getMyPlayerName() {
+  const userElem = document.querySelector(USERNAME_SELECTOR);
+  return userElem ? cleanPlayerString(userElem.textContent) : "joueur";
+}
+
 // ============================================================================
-// 💾 STORAGE (VALID WORDS BY MODE AND LENGTH)
+// 💾 STORAGE MANAGERS (MASTER REPOSITORY & ACTIVE CYCLES)
 // ============================================================================
 
-function loadValidWordsStore() {
+// 1. Grand répertoire permanent
+function loadMasterWordsStore() {
   try {
-    const data = localStorage.getItem(VALID_WORDS_KEY);
+    let data = localStorage.getItem(MASTER_WORDS_KEY);
+    // Migration automatique de l'ancienne clé si existante
+    if (!data) {
+      const legacy = localStorage.getItem(LEGACY_WORDS_KEY);
+      if (legacy) {
+        localStorage.setItem(MASTER_WORDS_KEY, legacy);
+        data = legacy;
+      }
+    }
     if (!data) return { normal: {}, difficile: {} };
     const parsed = JSON.parse(data);
     return {
@@ -81,30 +102,72 @@ function loadValidWordsStore() {
   }
 }
 
-function saveValidWordsStore(store) {
-  localStorage.setItem(VALID_WORDS_KEY, JSON.stringify(store));
+function saveMasterWordsStore(store) {
+  localStorage.setItem(MASTER_WORDS_KEY, JSON.stringify(store));
 }
 
-function addDiscoveredWord(word, mode, length) {
-  if (!word) return;
-  const store = loadValidWordsStore();
-  const lenKey = String(length);
-
-  if (!store[mode]) store[mode] = {};
-  if (!store[mode][lenKey]) store[mode][lenKey] = [];
-
-  const cleanWord = word.toLowerCase().trim();
-  if (!store[mode][lenKey].includes(cleanWord)) {
-    store[mode][lenKey].push(cleanWord);
-    store[mode][lenKey].sort();
-    saveValidWordsStore(store);
+// 2. Cycles actifs par compte
+function loadActiveCyclesStore() {
+  try {
+    const data = localStorage.getItem(ACTIVE_CYCLE_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch {
+    return {};
   }
 }
 
-function getDiscoveredWords(mode, length) {
-  const store = loadValidWordsStore();
+function saveActiveCyclesStore(store) {
+  localStorage.setItem(ACTIVE_CYCLE_KEY, JSON.stringify(store));
+}
+
+function getActiveCycleWords(playerName, mode, length) {
+  const store = loadActiveCyclesStore();
+  const player = cleanPlayerString(playerName);
   const lenKey = String(length);
-  return store[mode] && store[mode][lenKey] ? store[mode][lenKey] : [];
+  if (store[player] && store[player][mode] && store[player][mode][lenKey]) {
+    return store[player][mode][lenKey];
+  }
+  return [];
+}
+
+function resetActiveCycleLength(playerName, mode, length) {
+  const store = loadActiveCyclesStore();
+  const player = cleanPlayerString(playerName);
+  const lenKey = String(length);
+
+  if (store[player] && store[player][mode] && store[player][mode][lenKey]) {
+    delete store[player][mode][lenKey];
+    saveActiveCyclesStore(store);
+  }
+}
+
+function addDiscoveredWord(word, mode, length, playerName) {
+  if (!word) return;
+  const cleanWord = word.toLowerCase().trim();
+  const lenKey = String(length);
+  const player = cleanPlayerString(playerName);
+
+  // 1. Sauvegarde dans le grand répertoire permanent
+  const master = loadMasterWordsStore();
+  if (!master[mode]) master[mode] = {};
+  if (!master[mode][lenKey]) master[mode][lenKey] = [];
+  if (!master[mode][lenKey].includes(cleanWord)) {
+    master[mode][lenKey].push(cleanWord);
+    master[mode][lenKey].sort();
+    saveMasterWordsStore(master);
+  }
+
+  // 2. Sauvegarde dans le cycle actif du compte joueur
+  const cycles = loadActiveCyclesStore();
+  if (!cycles[player]) cycles[player] = { normal: {}, difficile: {} };
+  if (!cycles[player][mode]) cycles[player][mode] = {};
+  if (!cycles[player][mode][lenKey]) cycles[player][mode][lenKey] = [];
+
+  if (!cycles[player][mode][lenKey].includes(cleanWord)) {
+    cycles[player][mode][lenKey].push(cleanWord);
+    cycles[player][mode][lenKey].sort();
+    saveActiveCyclesStore(cycles);
+  }
 }
 
 function loadInvalidWords() {
@@ -121,6 +184,7 @@ function loadInvalidWords() {
 // ============================================================================
 
 let currentModalTab = "normal";
+let currentModalScope = "cycle"; // "cycle" ou "master"
 
 function injectDictionaryModal() {
   if (document.getElementById("motus-dict-modal-overlay")) return;
@@ -139,21 +203,30 @@ function injectDictionaryModal() {
   `;
 
   overlay.innerHTML = `
-    <div style="background: #ffffff; width: 680px; max-width: 90vw; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+    <div style="background: #ffffff; width: 720px; max-width: 92vw; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
       
       <!-- Header -->
       <div style="padding: 16px 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0; font-size: 18px; color: #212529;">📖 Mots découverts</h3>
+        <div>
+          <h3 style="margin: 0; font-size: 18px; color: #212529;">📖 Mots découverts</h3>
+          <span id="modal-active-player-name" style="font-size: 12px; color: #6c757d;">Compte : <strong>-</strong></span>
+        </div>
         <button id="motus-modal-close-btn" type="button" style="background: transparent; border: none; font-size: 20px; cursor: pointer; color: #6c757d; line-height: 1;">&times;</button>
       </div>
 
       <!-- Controls -->
-      <div style="padding: 12px 20px; border-bottom: 1px solid #eee; display: flex; gap: 12px; align-items: center; background: #fff;">
+      <div style="padding: 12px 20px; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: #fff;">
         <div style="display: flex; gap: 6px;">
           <button type="button" id="modal-tab-normal" class="motus-tab-btn active" style="padding: 6px 14px; border-radius: 6px;">Normal</button>
           <button type="button" id="modal-tab-difficile" class="motus-tab-btn" style="padding: 6px 14px; border-radius: 6px;">Difficile</button>
         </div>
-        <input type="text" id="modal-search-input" placeholder="Filtrer un mot..." style="flex: 1; padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px;">
+
+        <select id="modal-dict-scope" style="padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 12px; background: #fff; cursor: pointer; color: black;">
+          <option value="cycle">Cycle actif (compte)</option>
+          <option value="master">Grand répertoire (permanent)</option>
+        </select>
+
+        <input type="text" id="modal-search-input" placeholder="Filtrer un mot..." style="flex: 1; min-width: 130px; padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px;">
       </div>
 
       <!-- Scrollable content -->
@@ -164,7 +237,7 @@ function injectDictionaryModal() {
         <span id="modal-total-count" style="font-weight: 600; color: #495057;">0 mot enregistré</span>
         <div style="display: flex; gap: 8px;">
           <button type="button" id="modal-copy-json" style="padding: 7px 12px; font-size: 12px; font-weight: bold; background: #e7f1ff; border: 1px solid #0d6efd; color: #0d6efd; border-radius: 6px; cursor: pointer;">
-            📋 Copier tout (JSON)
+            📋 Copier (JSON)
           </button>
           <button type="button" id="modal-close-footer" style="padding: 7px 12px; font-size: 12px; background: #6c757d; border: none; color: #fff; border-radius: 6px; cursor: pointer;">
             Fermer
@@ -182,12 +255,8 @@ function injectDictionaryModal() {
     window.isEditingBotConfig = false;
   };
 
-  document
-    .getElementById("motus-modal-close-btn")
-    .addEventListener("click", close);
-  document
-    .getElementById("modal-close-footer")
-    .addEventListener("click", close);
+  document.getElementById("motus-modal-close-btn").addEventListener("click", close);
+  document.getElementById("modal-close-footer").addEventListener("click", close);
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) close();
   });
@@ -195,6 +264,7 @@ function injectDictionaryModal() {
   const tabNormal = document.getElementById("modal-tab-normal");
   const tabDifficile = document.getElementById("modal-tab-difficile");
   const searchInput = document.getElementById("modal-search-input");
+  const scopeSelect = document.getElementById("modal-dict-scope");
 
   tabNormal.addEventListener("click", () => {
     currentModalTab = "normal";
@@ -210,14 +280,23 @@ function injectDictionaryModal() {
     renderModalWords(searchInput.value);
   });
 
+  scopeSelect.addEventListener("change", (e) => {
+    currentModalScope = e.target.value;
+    renderModalWords(searchInput.value);
+  });
+
   searchInput.addEventListener("input", (e) => {
     renderModalWords(e.target.value);
   });
 
   document.getElementById("modal-copy-json").addEventListener("click", () => {
-    const raw = JSON.stringify(loadValidWordsStore(), null, 2);
+    const dataToCopy =
+      currentModalScope === "master"
+        ? loadMasterWordsStore()
+        : (loadActiveCyclesStore()[getMyPlayerName()] || {});
+    const raw = JSON.stringify(dataToCopy, null, 2);
     navigator.clipboard.writeText(raw).then(() => {
-      alert("Dictionnaire copié dans le presse-papier.");
+      alert("Données copiées dans le presse-papier.");
     });
   });
 }
@@ -237,6 +316,11 @@ function openDictionaryModal() {
     tabDifficile.classList.remove("active");
   }
 
+  const activePlayerEl = document.getElementById("modal-active-player-name");
+  if (activePlayerEl) {
+    activePlayerEl.innerHTML = `Compte actif : <strong style="color: #0d6efd;">${getMyPlayerName()}</strong>`;
+  }
+
   document.getElementById("modal-search-input").value = "";
   renderModalWords();
   overlay.style.display = "flex";
@@ -246,8 +330,17 @@ function openDictionaryModal() {
 function renderModalWords(query = "") {
   const container = document.getElementById("modal-dict-body");
   const countSpan = document.getElementById("modal-total-count");
-  const store = loadValidWordsStore();
-  const modeData = store[currentModalTab] || {};
+  const playerName = getMyPlayerName();
+
+  let modeData = {};
+  if (currentModalScope === "master") {
+    const master = loadMasterWordsStore();
+    modeData = master[currentModalTab] || {};
+  } else {
+    const cycles = loadActiveCyclesStore();
+    modeData = (cycles[playerName] && cycles[playerName][currentModalTab]) || {};
+  }
+
   const filter = query.trim().toLowerCase();
   const hasFilter = filter.length > 0;
 
@@ -299,11 +392,20 @@ function renderModalWords(query = "") {
         `;
       });
 
+      // Bouton de réinitialisation uniquement présent sur le cycle actif
+      const resetButtonHtml =
+        currentModalScope === "cycle"
+          ? `<button type="button" class="motus-btn-reset-len" data-len="${len}" style="padding: 2px 8px; font-size: 11px; font-weight: 600; background: #fff; border: 1px solid #dc3545; color: #dc3545; border-radius: 6px; cursor: pointer; transition: 0.2s;">🗑️ Vider</button>`
+          : "";
+
       html += `
         <details ${hasFilter ? "open" : ""} style="margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 8px; background: #ffffff; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
           <summary style="cursor: pointer; padding: 10px 14px; background: #ffffff; font-size: 13px; font-weight: bold; color: #0d6efd; display: flex; justify-content: space-between; align-items: center; user-select: none;">
             <span>📁 ${len} lettres</span>
-            <span style="background: #e7f1ff; color: #0d6efd; padding: 2px 8px; border-radius: 12px; font-size: 11px;">${matched.length} mot(s)</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="background: #e7f1ff; color: #0d6efd; padding: 2px 8px; border-radius: 12px; font-size: 11px;">${matched.length} mot(s)</span>
+              ${resetResetPlaceholder(resetButtonHtml)}
+            </div>
           </summary>
           <div style="padding: 6px 10px 10px 10px; background: #fdfdfd; border-top: 1px solid #f1f3f5;">
             ${groupsHtml}
@@ -320,13 +422,30 @@ function renderModalWords(query = "") {
   if (!html) {
     container.innerHTML = `
       <div style="text-align: center; color: #888; padding: 40px 0;">
-        ${hasFilter ? "Aucun mot ne correspond à la recherche." : "Aucun mot enregistré dans ce mode pour l'instant."}
+        ${hasFilter ? "Aucun mot ne correspond à la recherche." : "Aucun mot enregistré dans cette section pour l'instant."}
       </div>
     `;
     return;
   }
 
   container.innerHTML = html;
+
+  // Attachement des écouteurs pour la suppression ciblée
+  container.querySelectorAll(".motus-btn-reset-len").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const len = btn.getAttribute("data-len");
+      const confirmMsg = `Supprimer la liste des mots à ${len} lettres en mode ${currentModalTab.toUpperCase()} pour le compte « ${playerName} » ?\n\n(Le grand répertoire permanent restera intact).`;
+      if (confirm(confirmMsg)) {
+        resetActiveCycleLength(playerName, currentModalTab, len);
+        renderModalWords(query);
+      }
+    });
+  });
+}
+
+function resetResetPlaceholder(html) {
+  return html || "";
 }
 
 // ============================================================================
@@ -368,7 +487,6 @@ function injectSettingsUI() {
     .motus-bot-input:focus { border-color: #0d6efd; outline: none; }
     .motus-bot-row { margin-bottom: 12px; }
     .motus-bot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .motus-bot-desc { font-size: 11px; color: #6c757d; margin-bottom: 6px; line-height: 1.3; }
     
     .motus-bot-status-box { background: #f8f9fa; padding: 8px; border-radius: 8px; text-align: center; margin-bottom: 12px; border: 1px solid #dee2e6; }
     .motus-bot-hover-alert { display: none; font-size: 11px; color: #d63384; margin-top: 10px; text-align: center; font-style: italic; background: #fff0f6; padding: 6px; border-radius: 6px; border: 1px solid #ffcce0; }
@@ -379,6 +497,7 @@ function injectSettingsUI() {
 
     .motus-tab-btn { border: 1px solid #ced4da; background: #e9ecef; cursor: pointer; font-weight: bold; color: #495057; font-size: 12px; }
     .motus-tab-btn.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+    .motus-btn-reset-len:hover { background: #dc3545 !important; color: #fff !important; }
   `;
   document.head.appendChild(style);
 
@@ -503,8 +622,7 @@ function injectSettingsUI() {
   });
 
   const applyUIState = () => {
-    const isPlayerEnabled =
-      document.getElementById("bot-enable-player").checked;
+    const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
     const nameInput = document.getElementById("bot-target-name");
     const marginInput = document.getElementById("bot-target-margin");
     nameInput.disabled = !isPlayerEnabled;
@@ -522,10 +640,7 @@ function injectSettingsUI() {
   container.addEventListener("input", (e) => {
     if (e.target.id === "motus-bot-drag-handle") return;
     const currentConfig = loadConfig();
-    let parsedDelay = parseInt(
-      document.getElementById("bot-initial-delay").value,
-      10,
-    );
+    let parsedDelay = parseInt(document.getElementById("bot-initial-delay").value, 10);
     if (isNaN(parsedDelay) || parsedDelay < 0) parsedDelay = 0;
 
     saveConfig({
@@ -543,9 +658,7 @@ function injectSettingsUI() {
     applyUIState();
   });
 
-  document
-    .getElementById("bot-open-modal-btn")
-    .addEventListener("click", openDictionaryModal);
+  document.getElementById("bot-open-modal-btn").addEventListener("click", openDictionaryModal);
 
   const blockReload = () => {
     window.isEditingBotConfig = true;
@@ -602,8 +715,7 @@ function buildKeyboardMap() {
 
 async function fetchFrenchWordList() {
   const response = await fetch(WORD_SOURCE_URL);
-  if (!response.ok)
-    throw new Error(`Échec du téléchargement (${response.status})`);
+  if (!response.ok) throw new Error(`Échec du téléchargement (${response.status})`);
   const text = await response.text();
   const allWords = text
     .split(/\r?\n/)
@@ -817,11 +929,6 @@ async function typeWord(word, keyboardMap, currentRow, delay = 60) {
 // 📊 SCORE & LEADERBOARD PARSER
 // ============================================================================
 
-function cleanPlayerString(str) {
-  if (!str) return "";
-  return str.replace(/\s*\(\s*vous\s*\)/gi, "").trim().toLowerCase();
-}
-
 function getPlayerScore(playerName) {
   if (!playerName) return 0;
   const targetName = cleanPlayerString(playerName);
@@ -856,11 +963,6 @@ function getPlayerScore(playerName) {
     }
   }
   return 0;
-}
-
-function getMyPlayerName() {
-  const userElem = document.querySelector(USERNAME_SELECTOR);
-  return userElem ? cleanPlayerString(userElem.textContent) : "";
 }
 
 function getTotalScore() {
@@ -919,16 +1021,18 @@ async function startGame() {
   const currentMode = getCurrentGameMode();
   const lettersCount = getNumberOfLetters();
   const maxAttempts = getMaxAttempts();
+  const currentPlayer = getMyPlayerName();
 
   const allWords = await fetchFrenchWordList();
   const invalidWords = loadInvalidWords();
-  const discoveredWords = getDiscoveredWords(currentMode, lettersCount);
+  // On exclut uniquement les mots déjà trouvés dans le CYCLE ACTUEL du compte
+  const cycleWords = getActiveCycleWords(currentPlayer, currentMode, lettersCount);
   const attemptedInGame = [];
 
   let wordPool = allWords
     .filter((w) => w.length === lettersCount)
     .filter((w) => !invalidWords.includes(w))
-    .filter((w) => !discoveredWords.includes(w));
+    .filter((w) => !cycleWords.includes(w));
 
   const gameState = initializeGameStateFromGrid();
   const keyboardMap = buildKeyboardMap();
@@ -1000,7 +1104,7 @@ async function startGame() {
     updateBotStatus(`🎉 Mot trouvé (${attempt}/${maxAttempts}) !`, "#198754");
     const winningWord = attemptedInGame[attemptedInGame.length - 1];
     if (winningWord) {
-      addDiscoveredWord(winningWord, currentMode, lettersCount);
+      addDiscoveredWord(winningWord, currentMode, lettersCount, currentPlayer);
     }
   } else {
     updateBotStatus(`😞 Mot manqué.`, "#dc3545");
