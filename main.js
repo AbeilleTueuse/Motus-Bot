@@ -33,6 +33,8 @@ const DEFAULT_CONFIG = {
   panelTop: "10px",
   panelLeft: "10px",
   initialDelay: 5,
+  enableHumanMode: false,
+  humanAvgDelay: 4,
 };
 
 function loadConfig() {
@@ -542,6 +544,22 @@ function injectSettingsUI() {
       </div>
 
       <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
+
+      <div class="motus-bot-row">
+        <div class="motus-bot-header">
+          <strong>Jouer en mode humain</strong>
+          <label class="motus-bot-toggle">
+            <input type="checkbox" id="bot-enable-human" ${config.enableHumanMode ? "checked" : ""}>
+            <span class="motus-bot-slider"></span>
+          </label>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="number" id="bot-human-delay" class="motus-bot-input" value="${config.humanAvgDelay}" min="0" step="0.5" style="width: 75px;">
+          <span style="font-size: 11px; color: #6c757d;">s / mot (moy. ±75%)</span>
+        </div>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
       
       <div class="motus-bot-row">
         <div class="motus-bot-header">
@@ -631,6 +649,11 @@ function injectSettingsUI() {
   });
 
   const applyUIState = () => {
+    const isHumanEnabled = document.getElementById("bot-enable-human").checked;
+    const humanDelayInput = document.getElementById("bot-human-delay");
+    humanDelayInput.disabled = !isHumanEnabled;
+    humanDelayInput.parentElement.style.opacity = isHumanEnabled ? "1" : "0.5";
+
     const isPlayerEnabled = document.getElementById("bot-enable-player").checked;
     const nameInput = document.getElementById("bot-target-name");
     const marginInput = document.getElementById("bot-target-margin");
@@ -652,10 +675,15 @@ function injectSettingsUI() {
     let parsedDelay = parseInt(document.getElementById("bot-initial-delay").value, 10);
     if (isNaN(parsedDelay) || parsedDelay < 0) parsedDelay = 0;
 
+    let parsedHumanDelay = parseFloat(document.getElementById("bot-human-delay").value);
+    if (isNaN(parsedHumanDelay) || parsedHumanDelay < 0) parsedHumanDelay = 0;
+
     saveConfig({
       ...currentConfig,
       isPaused: document.getElementById("bot-pause").checked,
       initialDelay: parsedDelay,
+      enableHumanMode: document.getElementById("bot-enable-human").checked,
+      humanAvgDelay: parsedHumanDelay,
       enableTargetPlayer: document.getElementById("bot-enable-player").checked,
       targetPlayerName: document.getElementById("bot-target-name").value.trim(),
       targetScoreMargin:
@@ -924,17 +952,50 @@ function findNextCandidate(wordPool, gameState, attemptedInGame) {
 }
 
 // ============================================================================
-// ⌨️ TYPING ENGINE
+// ⌨️ TYPING ENGINE & HUMAN DELAY
 // ============================================================================
+
+async function waitHumanDelayIfNeeded() {
+  const config = loadConfig();
+  if (!config.enableHumanMode || config.humanAvgDelay <= 0) return;
+
+  // Variation symétrique de ±75% autour de la moyenne (entre 0.25x et 1.75x)
+  const factor = 0.25 + Math.random() * 1.5;
+  let remainingMs = Math.round(config.humanAvgDelay * 1000 * factor);
+
+  while (remainingMs > 0) {
+    while (loadConfig().isPaused) {
+      updateBotStatus("⏸️ En pause", "#dc3545");
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    const currentCfg = loadConfig();
+    if (!currentCfg.enableHumanMode || currentCfg.humanAvgDelay <= 0) break;
+
+    updateBotStatus(
+      `🤔 Réflexion (${(remainingMs / 1000).toFixed(1)}s)...`,
+      "#0dcaf0",
+    );
+    const step = Math.min(200, remainingMs);
+    await new Promise((r) => setTimeout(r, step));
+    remainingMs -= step;
+  }
+}
 
 async function typeWord(word, keyboardMap, currentRow, delay = 60) {
   if (typeof word !== "string") throw new TypeError("Mot invalide.");
+
+  const config = loadConfig();
+  const useHumanTyping = config.enableHumanMode && config.humanAvgDelay > 0;
 
   const letters = word.toLowerCase().split("");
   for (const letter of letters) {
     const key = keyboardMap[letter];
     if (key) key.click();
-    await new Promise((r) => setTimeout(r, delay));
+    // Si le mode humain est actif, cadence de frappe variable (45 ms à 165 ms par lettre)
+    const keystrokeDelay = useHumanTyping
+      ? Math.floor(45 + Math.random() * 120)
+      : delay;
+    await new Promise((r) => setTimeout(r, keystrokeDelay));
   }
 
   if (keyboardMap["enter"]) {
@@ -1112,6 +1173,9 @@ async function startGame() {
       await triggerAntiLossReload("Dictionnaire épuisé");
       return;
     }
+
+    await waitHumanDelayIfNeeded();
+    if (checkTargetReached()) return;
 
     const grid = getGrid();
     const rows = grid.querySelectorAll(ROW_SELECTOR);
