@@ -179,6 +179,15 @@ function loadInvalidWords() {
   }
 }
 
+function getMasterWords(mode, length) {
+  const store = loadMasterWordsStore();
+  const lenKey = String(length);
+  if (store[mode] && store[mode][lenKey]) {
+    return store[mode][lenKey];
+  }
+  return [];
+}
+
 // ============================================================================
 // 🪟 DICTIONARY MODAL
 // ============================================================================
@@ -683,6 +692,20 @@ async function triggerSafeReload() {
   location.reload();
 }
 
+// 🛡️ Fonction de rechargement anti-défaite (supprime PHPSESSID avant le reload)
+async function triggerAntiLossReload(reason = "Sécurité anti-défaite") {
+  if (window.isEditingBotConfig) {
+    updateBotStatus("En pause avant reset anti-défaite...", "#fd7e14");
+  }
+  while (window.isEditingBotConfig) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  updateBotStatus(`🛡️ ${reason} : reset session...`, "#dc3545");
+  document.cookie = "PHPSESSID=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+  console.log("PHPSESSID deleted! Reloading...");
+  window.location.reload();
+}
+
 // ============================================================================
 // 🎹 VIRTUAL KEYBOARD INTEGRATION
 // ============================================================================
@@ -1025,14 +1048,25 @@ async function startGame() {
 
   const allWords = await fetchFrenchWordList();
   const invalidWords = loadInvalidWords();
-  // On exclut uniquement les mots déjà trouvés dans le CYCLE ACTUEL du compte
   const cycleWords = getActiveCycleWords(currentPlayer, currentMode, lettersCount);
+  const masterWords = getMasterWords(currentMode, lettersCount);
   const attemptedInGame = [];
 
-  let wordPool = allWords
+  // 1. Mots prioritaires : présents dans le Grand Répertoire mais pas dans le cycle actif
+  const priorityWords = masterWords
     .filter((w) => w.length === lettersCount)
     .filter((w) => !invalidWords.includes(w))
     .filter((w) => !cycleWords.includes(w));
+
+  // 2. Mots secondaires : reste du dictionnaire GitHub (sans doublons)
+  const secondaryWords = allWords
+    .filter((w) => w.length === lettersCount)
+    .filter((w) => !invalidWords.includes(w))
+    .filter((w) => !cycleWords.includes(w))
+    .filter((w) => !priorityWords.includes(w));
+
+  // Fusion : findNextCandidate() piochera d'abord dans priorityWords
+  let wordPool = [...priorityWords, ...secondaryWords];
 
   const gameState = initializeGameStateFromGrid();
   const keyboardMap = buildKeyboardMap();
@@ -1064,16 +1098,19 @@ async function startGame() {
       }
     }
 
+    // 🛡️ SÉCURITÉ ANTI-DÉFAITE : Si la 5e ligne n'a pas suffi, on ne joue pas la 6e ligne
+    if (attempt >= maxAttempts - 1) {
+      await triggerAntiLossReload("6e ligne atteinte");
+      return;
+    }
+
     updateBotStatus("Calcul du mot...", "#0d6efd");
     let word = findNextCandidate(wordPool, gameState, attemptedInGame);
 
+    // 🛡️ Si aucun mot du dictionnaire ne correspond, on évite de perdre
     if (!word) {
-      if (attemptedInGame.length > 0) {
-        word = attemptedInGame[0];
-      } else {
-        updateBotStatus("❌ Dictionnaire épuisé", "#dc3545");
-        break;
-      }
+      await triggerAntiLossReload("Dictionnaire épuisé");
+      return;
     }
 
     const grid = getGrid();
@@ -1090,27 +1127,16 @@ async function startGame() {
     attempt++;
   }
 
-  if (!won && attempt > 0) {
-    const grid = getGrid();
-    const rows = grid.querySelectorAll(ROW_SELECTOR);
-    const lastRow = rows[attempt - 1] || grid.children[attempt - 1];
-    const data = getRowData(lastRow);
-    if (data.length > 0 && data.every((cell) => cell.status === "wellPlaced")) {
-      won = true;
-    }
-  }
-
   if (won) {
     updateBotStatus(`🎉 Mot trouvé (${attempt}/${maxAttempts}) !`, "#198754");
     const winningWord = attemptedInGame[attemptedInGame.length - 1];
     if (winningWord) {
       addDiscoveredWord(winningWord, currentMode, lettersCount, currentPlayer);
     }
+    await triggerSafeReload();
   } else {
-    updateBotStatus(`😞 Mot manqué.`, "#dc3545");
+    await triggerAntiLossReload("Mot non trouvé");
   }
-
-  await triggerSafeReload();
 }
 
 console.clear();
